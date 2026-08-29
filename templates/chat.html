@@ -1,0 +1,1701 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>AI Student Assistant</title>
+
+    <style>
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+
+        :root {
+            --bg: #070b14;
+            --panel: #101827;
+            --border: rgba(255, 255, 255, 0.10);
+            --text: #f8fafc;
+            --muted: #94a3b8;
+            --primary: #6366f1;
+            --secondary: #8b5cf6;
+            --green: #22c55e;
+        }
+
+
+        body {
+            font-family:
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                Arial,
+                sans-serif;
+
+            background:
+                radial-gradient(
+                    circle at 10% 10%,
+                    rgba(99, 102, 241, 0.18),
+                    transparent 30%
+                ),
+                radial-gradient(
+                    circle at 90% 20%,
+                    rgba(139, 92, 246, 0.15),
+                    transparent 30%
+                ),
+                var(--bg);
+
+            color: var(--text);
+
+            min-height: 100vh;
+        }
+
+
+        /* ================= HEADER ================= */
+
+        .header {
+            height: 72px;
+
+            padding: 0 30px;
+
+            display: flex;
+
+            justify-content: space-between;
+
+            align-items: center;
+
+            position: sticky;
+
+            top: 0;
+
+            z-index: 100;
+
+            background: rgba(7, 11, 20, 0.85);
+
+            backdrop-filter: blur(20px);
+
+            border-bottom:
+                1px solid var(--border);
+        }
+
+
+        .brand {
+            display: flex;
+
+            align-items: center;
+
+            gap: 12px;
+        }
+
+
+        .logo {
+            width: 45px;
+            height: 45px;
+
+            display: flex;
+
+            justify-content: center;
+            align-items: center;
+
+            font-size: 22px;
+
+            border-radius: 14px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    var(--primary),
+                    var(--secondary)
+                );
+        }
+
+
+        .brand h1 {
+            font-size: 17px;
+        }
+
+
+        .brand p {
+            font-size: 12px;
+
+            color: var(--muted);
+
+            margin-top: 3px;
+        }
+
+
+        .header-right {
+            display: flex;
+
+            align-items: center;
+
+            gap: 10px;
+        }
+
+
+        .online {
+            display: flex;
+
+            align-items: center;
+
+            gap: 7px;
+
+            color: #86efac;
+
+            font-size: 12px;
+        }
+
+
+        .dot {
+            width: 8px;
+            height: 8px;
+
+            border-radius: 50%;
+
+            background: var(--green);
+
+            box-shadow:
+                0 0 10px var(--green);
+        }
+
+
+        .header button {
+            border: 1px solid var(--border);
+
+            background:
+                rgba(255, 255, 255, 0.05);
+
+            color: white;
+
+            padding: 9px 13px;
+
+            border-radius: 10px;
+
+            cursor: pointer;
+        }
+
+
+        .header button:hover {
+            background:
+                rgba(255, 255, 255, 0.12);
+        }
+
+
+        /* ================= CHAT ================= */
+
+        .chat-container {
+            width: 100%;
+
+            max-width: 1000px;
+
+            margin: auto;
+
+            padding:
+                40px 22px 180px;
+        }
+
+
+        #messages {
+            display: flex;
+
+            flex-direction: column;
+
+            gap: 28px;
+        }
+
+
+        /* ================= WELCOME ================= */
+
+        .welcome {
+            text-align: center;
+
+            padding-top: 70px;
+        }
+
+
+        .welcome-logo {
+            width: 90px;
+            height: 90px;
+
+            margin:
+                0 auto 25px;
+
+            display: flex;
+
+            align-items: center;
+            justify-content: center;
+
+            font-size: 42px;
+
+            border-radius: 25px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    var(--primary),
+                    var(--secondary)
+                );
+
+            box-shadow:
+                0 20px 60px
+                rgba(99, 102, 241, 0.35);
+        }
+
+
+        .welcome h2 {
+            font-size: 38px;
+
+            margin-bottom: 14px;
+        }
+
+
+        .welcome p {
+            max-width: 600px;
+
+            margin: auto;
+
+            color: var(--muted);
+
+            line-height: 1.7;
+        }
+
+
+        /* ================= SUGGESTIONS ================= */
+
+        .suggestions {
+            display: grid;
+
+            grid-template-columns:
+                repeat(4, 1fr);
+
+            gap: 14px;
+
+            margin-top: 40px;
+        }
+
+
+        .suggestion {
+            padding: 18px;
+
+            text-align: left;
+
+            border-radius: 17px;
+
+            cursor: pointer;
+
+            background:
+                rgba(255, 255, 255, 0.04);
+
+            border:
+                1px solid var(--border);
+
+            transition: 0.25s;
+        }
+
+
+        .suggestion:hover {
+            transform:
+                translateY(-5px);
+
+            background:
+                rgba(99, 102, 241, 0.10);
+
+            border-color:
+                rgba(129, 140, 248, 0.5);
+        }
+
+
+        .suggestion-icon {
+            font-size: 25px;
+
+            margin-bottom: 10px;
+        }
+
+
+        .suggestion-title {
+            font-weight: 700;
+
+            font-size: 14px;
+
+            margin-bottom: 6px;
+        }
+
+
+        .suggestion-text {
+            color: var(--muted);
+
+            font-size: 12px;
+        }
+
+
+        /* ================= MESSAGES ================= */
+
+        .message {
+            display: flex;
+
+            gap: 13px;
+
+            max-width: 850px;
+
+            animation:
+                fadeIn 0.3s ease;
+        }
+
+
+        .message.user {
+            align-self: flex-end;
+
+            flex-direction: row-reverse;
+        }
+
+
+        @keyframes fadeIn {
+
+            from {
+                opacity: 0;
+
+                transform:
+                    translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+
+                transform:
+                    translateY(0);
+            }
+
+        }
+
+
+        .avatar {
+            width: 42px;
+            height: 42px;
+
+            min-width: 42px;
+
+            display: flex;
+
+            justify-content: center;
+            align-items: center;
+
+            border-radius: 13px;
+
+            font-size: 19px;
+        }
+
+
+        .assistant .avatar {
+            background:
+                linear-gradient(
+                    135deg,
+                    var(--primary),
+                    var(--secondary)
+                );
+        }
+
+
+        .user .avatar {
+            background:
+                linear-gradient(
+                    135deg,
+                    #0284c7,
+                    #2563eb
+                );
+        }
+
+
+        .message-content {
+            max-width: 700px;
+        }
+
+
+        .message-name {
+            font-size: 12px;
+
+            color: var(--muted);
+
+            font-weight: 700;
+
+            margin-bottom: 6px;
+        }
+
+
+        .message-text {
+            white-space: pre-wrap;
+
+            word-break: break-word;
+
+            line-height: 1.7;
+
+            font-size: 16px;
+        }
+
+
+        .user .message-text {
+            padding: 14px 18px;
+
+            border-radius:
+                18px 18px 4px 18px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    rgba(37, 99, 235, 0.5),
+                    rgba(99, 102, 241, 0.35)
+                );
+
+            border:
+                1px solid var(--border);
+        }
+
+
+        /* ================= TYPING ================= */
+
+        .typing {
+            display: flex;
+
+            gap: 6px;
+
+            padding-top: 8px;
+        }
+
+
+        .typing span {
+            width: 8px;
+            height: 8px;
+
+            border-radius: 50%;
+
+            background: var(--muted);
+
+            animation:
+                bounce 1.2s infinite;
+        }
+
+
+        .typing span:nth-child(2) {
+            animation-delay: 0.15s;
+        }
+
+
+        .typing span:nth-child(3) {
+            animation-delay: 0.3s;
+        }
+
+
+        @keyframes bounce {
+
+            0%, 60%, 100% {
+                transform:
+                    translateY(0);
+            }
+
+            30% {
+                transform:
+                    translateY(-7px);
+            }
+
+        }
+
+
+        /* ================= INPUT ================= */
+
+        .input-area {
+            position: fixed;
+
+            bottom: 0;
+
+            left: 50%;
+
+            transform:
+                translateX(-50%);
+
+            width:
+                min(
+                    950px,
+                    calc(100% - 30px)
+                );
+
+            z-index: 200;
+
+            padding-bottom: 15px;
+        }
+
+
+        .input-box {
+            display: flex;
+
+            align-items: flex-end;
+
+            gap: 10px;
+
+            padding:
+                10px 10px 10px 17px;
+
+            border-radius: 22px;
+
+            background:
+                rgba(15, 23, 42, 0.96);
+
+            border:
+                1px solid var(--border);
+
+            box-shadow:
+                0 20px 60px
+                rgba(0, 0, 0, 0.5);
+        }
+
+
+        textarea {
+            flex: 1;
+
+            resize: none;
+
+            border: none;
+
+            outline: none;
+
+            background: transparent;
+
+            color: white;
+
+            font-family: inherit;
+
+            font-size: 16px;
+
+            padding: 12px 3px;
+
+            min-height: 48px;
+
+            max-height: 150px;
+        }
+
+
+        textarea::placeholder {
+            color: #64748b;
+        }
+
+
+        #sendButton {
+            width: 50px;
+            height: 50px;
+
+            border: none;
+
+            border-radius: 15px;
+
+            color: white;
+
+            font-size: 19px;
+
+            cursor: pointer;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    var(--primary),
+                    var(--secondary)
+                );
+        }
+
+
+        #sendButton.stop {
+            background:
+                #ef4444;
+        }
+
+
+        .input-footer {
+            text-align: center;
+
+            margin-top: 8px;
+
+            color: #64748b;
+
+            font-size: 11px;
+        }
+
+
+        /* ================= MOBILE ================= */
+
+        @media (max-width: 800px) {
+
+            .suggestions {
+                grid-template-columns:
+                    repeat(2, 1fr);
+            }
+
+        }
+
+
+        @media (max-width: 600px) {
+
+            .header {
+                padding: 0 14px;
+            }
+
+
+            .brand p,
+            .online {
+                display: none;
+            }
+
+
+            .welcome h2 {
+                font-size: 28px;
+            }
+
+
+            .suggestions {
+                grid-template-columns:
+                    repeat(2, 1fr);
+            }
+
+
+            .chat-container {
+                padding:
+                    30px 14px 180px;
+            }
+
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+    <header class="header">
+
+        <div class="brand">
+
+            <div class="logo">🤖</div>
+
+            <div>
+
+                <h1>AI Student Assistant</h1>
+
+                <p>Your intelligent learning companion</p>
+
+            </div>
+
+        </div>
+
+
+        <div class="header-right">
+
+            <div class="online">
+
+                <div class="dot"></div>
+
+                AI Online
+
+            </div>
+
+
+            <button onclick="clearChat()">
+                🗑 Clear
+            </button>
+
+
+            <button onclick="window.location.href='/'">
+                ← Home
+            </button>
+
+        </div>
+
+    </header>
+
+
+
+    <main class="chat-container">
+
+        <div id="messages">
+
+            <div
+                class="welcome"
+                id="welcome"
+            >
+
+                <div class="welcome-logo">
+                    🎓
+                </div>
+
+
+                <h2>
+                    What would you like to learn?
+                </h2>
+
+
+                <p>
+                    Your personal AI study companion for programming,
+                    CSE subjects, projects and exam preparation.
+                </p>
+
+
+                <div class="suggestions">
+
+
+                    <div
+                        class="suggestion"
+                        onclick="useSuggestion('Explain DBMS normalization with examples')"
+                    >
+
+                        <div class="suggestion-icon">
+                            📚
+                        </div>
+
+                        <div class="suggestion-title">
+                            DBMS
+                        </div>
+
+                        <div class="suggestion-text">
+                            Learn concepts clearly
+                        </div>
+
+                    </div>
+
+
+                    <div
+                        class="suggestion"
+                        onclick="useSuggestion('Explain Python functions with examples')"
+                    >
+
+                        <div class="suggestion-icon">
+                            💻
+                        </div>
+
+                        <div class="suggestion-title">
+                            Programming
+                        </div>
+
+                        <div class="suggestion-text">
+                            Learn coding easily
+                        </div>
+
+                    </div>
+
+
+                    <div
+                        class="suggestion"
+                        onclick="useSuggestion('Give me 10 Operating Systems interview questions')"
+                    >
+
+                        <div class="suggestion-icon">
+                            📝
+                        </div>
+
+                        <div class="suggestion-title">
+                            Practice
+                        </div>
+
+                        <div class="suggestion-text">
+                            Prepare for exams
+                        </div>
+
+                    </div>
+
+
+                    <div
+                        class="suggestion"
+                        onclick="useSuggestion('Create a study plan for my exams')"
+                    >
+
+                        <div class="suggestion-icon">
+                            🚀
+                        </div>
+
+                        <div class="suggestion-title">
+                            Study Plan
+                        </div>
+
+                        <div class="suggestion-text">
+                            Study smarter
+                        </div>
+
+                    </div>
+
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+
+
+    <div class="input-area">
+
+        <div class="input-box">
+
+            <textarea
+                id="question"
+                rows="1"
+                placeholder="Ask anything about your studies..."
+            ></textarea>
+
+
+            <button
+                id="sendButton"
+                onclick="handleButton()"
+            >
+                ➤
+            </button>
+
+        </div>
+
+
+        <div class="input-footer">
+
+            AI Student Assistant may make mistakes.
+            Verify important information.
+
+        </div>
+
+    </div>
+
+
+
+    <script>
+
+        let conversation = [];
+
+        let isGenerating = false;
+
+        let abortController = null;
+
+
+        const questionInput =
+            document.getElementById("question");
+
+
+        const sendButton =
+            document.getElementById("sendButton");
+
+
+        const messages =
+            document.getElementById("messages");
+
+
+        /* AUTO RESIZE */
+
+        questionInput.addEventListener(
+            "input",
+            function () {
+
+                this.style.height = "auto";
+
+                this.style.height =
+                    Math.min(
+                        this.scrollHeight,
+                        150
+                    ) + "px";
+
+            }
+        );
+
+
+        /* ENTER TO SEND */
+
+        questionInput.addEventListener(
+            "keydown",
+            function (event) {
+
+                if (
+                    event.key === "Enter" &&
+                    !event.shiftKey
+                ) {
+
+                    event.preventDefault();
+
+                    handleButton();
+
+                }
+
+            }
+        );
+
+
+        function useSuggestion(text) {
+
+            questionInput.value = text;
+
+            sendMessage();
+
+        }
+
+
+        function handleButton() {
+
+            if (isGenerating) {
+
+                stopGenerating();
+
+            } else {
+
+                sendMessage();
+
+            }
+
+        }
+
+
+        function addMessage(role, content) {
+
+            const welcome =
+                document.getElementById("welcome");
+
+
+            if (welcome) {
+                welcome.remove();
+            }
+
+
+            const message =
+                document.createElement("div");
+
+
+            message.className =
+                "message " + role;
+
+
+            const avatar =
+                document.createElement("div");
+
+
+            avatar.className =
+                "avatar";
+
+
+            avatar.textContent =
+                role === "user"
+                    ? "👤"
+                    : "🤖";
+
+
+            const contentBox =
+                document.createElement("div");
+
+
+            contentBox.className =
+                "message-content";
+
+
+            const name =
+                document.createElement("div");
+
+
+            name.className =
+                "message-name";
+
+
+            name.textContent =
+                role === "user"
+                    ? "You"
+                    : "AI Student Assistant";
+
+
+            const text =
+                document.createElement("div");
+
+
+            text.className =
+                "message-text";
+
+
+            text.textContent =
+                content;
+
+
+            contentBox.appendChild(name);
+
+            contentBox.appendChild(text);
+
+
+            message.appendChild(avatar);
+
+            message.appendChild(contentBox);
+
+
+            messages.appendChild(message);
+
+
+            scrollToBottom();
+
+
+            return text;
+
+        }
+
+
+        function showTyping() {
+
+            const message =
+                document.createElement("div");
+
+
+            message.className =
+                "message assistant";
+
+
+            message.id =
+                "typingMessage";
+
+
+            const avatar =
+                document.createElement("div");
+
+
+            avatar.className =
+                "avatar";
+
+
+            avatar.textContent = "🤖";
+
+
+            const contentBox =
+                document.createElement("div");
+
+
+            contentBox.className =
+                "message-content";
+
+
+            const name =
+                document.createElement("div");
+
+
+            name.className =
+                "message-name";
+
+
+            name.textContent =
+                "AI Student Assistant";
+
+
+            const typing =
+                document.createElement("div");
+
+
+            typing.className = "typing";
+
+
+            typing.innerHTML =
+                "<span></span>" +
+                "<span></span>" +
+                "<span></span>";
+
+
+            contentBox.appendChild(name);
+
+            contentBox.appendChild(typing);
+
+
+            message.appendChild(avatar);
+
+            message.appendChild(contentBox);
+
+
+            messages.appendChild(message);
+
+
+            scrollToBottom();
+
+        }
+
+
+        function removeTyping() {
+
+            const typing =
+                document.getElementById(
+                    "typingMessage"
+                );
+
+
+            if (typing) {
+                typing.remove();
+            }
+
+        }
+
+
+        function stopGenerating() {
+
+            if (abortController) {
+
+                abortController.abort();
+
+            }
+
+        }
+
+
+        async function sendMessage() {
+
+            if (isGenerating) {
+                return;
+            }
+
+
+            const question =
+                questionInput.value.trim();
+
+
+            if (!question) {
+                return;
+            }
+
+
+            isGenerating = true;
+
+
+            sendButton.classList.add("stop");
+
+            sendButton.textContent = "■";
+
+
+            const history =
+                [...conversation];
+
+
+            addMessage(
+                "user",
+                question
+            );
+
+
+            conversation.push({
+
+                role: "user",
+
+                content: question
+
+            });
+
+
+            questionInput.value = "";
+
+            questionInput.style.height = "auto";
+
+
+            showTyping();
+
+
+            abortController =
+                new AbortController();
+
+
+            try {
+
+                const response =
+                    await fetch(
+                        "/api/assistant",
+                        {
+
+                            method: "POST",
+
+                            headers: {
+
+                                "Content-Type":
+                                    "application/json"
+
+                            },
+
+                            signal:
+                                abortController.signal,
+
+                            body:
+                                JSON.stringify({
+
+                                    question: question,
+
+                                    history: history
+
+                                })
+
+                        }
+                    );
+
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        "Server error: " +
+                        response.status
+                    );
+
+                }
+
+
+                const contentType =
+                    response.headers.get(
+                        "content-type"
+                    ) || "";
+
+
+                removeTyping();
+
+
+                const assistantText =
+                    addMessage(
+                        "assistant",
+                        ""
+                    );
+
+
+                let fullAnswer = "";
+
+
+                /* ===============================
+                   NORMAL JSON RESPONSE
+                =============================== */
+
+                if (
+                    contentType.includes(
+                        "application/json"
+                    )
+                ) {
+
+                    const data =
+                        await response.json();
+
+
+                    fullAnswer =
+                        data.answer ||
+                        data.response ||
+                        data.message ||
+                        data.text ||
+                        data.result ||
+                        data.token ||
+                        "No response received.";
+
+
+                    assistantText.textContent =
+                        fullAnswer;
+
+                }
+
+
+                /* ===============================
+                   STREAMING RESPONSE
+                =============================== */
+
+                else {
+
+                    const reader =
+                        response.body.getReader();
+
+
+                    const decoder =
+                        new TextDecoder();
+
+
+                    let buffer = "";
+
+
+                    while (true) {
+
+                        const result =
+                            await reader.read();
+
+
+                        if (result.done) {
+                            break;
+                        }
+
+
+                        buffer +=
+                            decoder.decode(
+                                result.value,
+                                {
+                                    stream: true
+                                }
+                            );
+
+
+                        const lines =
+                            buffer.split("\n");
+
+
+                        buffer =
+                            lines.pop();
+
+
+                        for (
+                            const rawLine
+                            of lines
+                        ) {
+
+                            let line =
+                                rawLine.trim();
+
+
+                            if (!line) {
+                                continue;
+                            }
+
+
+                            /* Support SSE */
+
+                            if (
+                                line.startsWith(
+                                    "data:"
+                                )
+                            ) {
+
+                                line =
+                                    line.substring(
+                                        5
+                                    ).trim();
+
+                            }
+
+
+                            try {
+
+                                const data =
+                                    JSON.parse(
+                                        line
+                                    );
+
+
+                                if (
+                                    data.error
+                                ) {
+
+                                    throw new Error(
+                                        data.error
+                                    );
+
+                                }
+
+
+                                const token =
+                                    data.token ||
+                                    data.response ||
+                                    data.answer ||
+                                    "";
+
+
+                                if (
+                                    typeof token ===
+                                    "string"
+                                ) {
+
+                                    fullAnswer +=
+                                        token;
+
+
+                                    assistantText.textContent =
+                                        fullAnswer;
+
+
+                                    scrollToBottom();
+
+                                }
+
+                            }
+
+                            catch (e) {
+
+                                console.log(
+                                    "Waiting for valid stream data..."
+                                );
+
+                            }
+
+                        }
+
+                    }
+
+
+                    /* Last data */
+
+                    if (
+                        buffer.trim()
+                    ) {
+
+                        try {
+
+                            let line =
+                                buffer.trim();
+
+
+                            if (
+                                line.startsWith(
+                                    "data:"
+                                )
+                            ) {
+
+                                line =
+                                    line.substring(
+                                        5
+                                    ).trim();
+
+                            }
+
+
+                            const data =
+                                JSON.parse(line);
+
+
+                            const token =
+                                data.token ||
+                                data.response ||
+                                data.answer ||
+                                "";
+
+
+                            if (
+                                typeof token ===
+                                "string"
+                            ) {
+
+                                fullAnswer +=
+                                    token;
+
+                            }
+
+                        }
+
+                        catch (e) {}
+
+                    }
+
+
+                    assistantText.textContent =
+                        fullAnswer ||
+                        "No response received.";
+
+                }
+
+
+                if (
+                    fullAnswer.trim()
+                ) {
+
+                    conversation.push({
+
+                        role: "assistant",
+
+                        content:
+                            fullAnswer
+
+                    });
+
+                }
+
+            }
+
+
+            catch (error) {
+
+                removeTyping();
+
+
+                if (
+                    error.name ===
+                    "AbortError"
+                ) {
+
+                    addMessage(
+                        "assistant",
+                        "⏹️ Response stopped."
+                    );
+
+                }
+
+                else {
+
+                    console.error(error);
+
+
+                    addMessage(
+                        "assistant",
+                        "❌ Error: " +
+                        error.message
+                    );
+
+                }
+
+            }
+
+
+            finally {
+
+                isGenerating = false;
+
+                abortController = null;
+
+
+                sendButton.classList.remove(
+                    "stop"
+                );
+
+
+                sendButton.textContent = "➤";
+
+
+                questionInput.focus();
+
+
+                scrollToBottom();
+
+            }
+
+        }
+
+
+        function clearChat() {
+
+            if (isGenerating) {
+
+                stopGenerating();
+
+            }
+
+
+            conversation = [];
+
+
+            messages.innerHTML = `
+
+                <div class="welcome" id="welcome">
+
+                    <div class="welcome-logo">
+                        🎓
+                    </div>
+
+                    <h2>
+                        What would you like to learn?
+                    </h2>
+
+                    <p>
+                        Your personal AI study companion for programming,
+                        CSE subjects, projects and exam preparation.
+                    </p>
+
+                    <div class="suggestions">
+
+                        <div
+                            class="suggestion"
+                            onclick="useSuggestion('Explain DBMS normalization with examples')"
+                        >
+
+                            <div class="suggestion-icon">
+                                📚
+                            </div>
+
+                            <div class="suggestion-title">
+                                DBMS
+                            </div>
+
+                            <div class="suggestion-text">
+                                Learn concepts clearly
+                            </div>
+
+                        </div>
+
+
+                        <div
+                            class="suggestion"
+                            onclick="useSuggestion('Explain Python functions with examples')"
+                        >
+
+                            <div class="suggestion-icon">
+                                💻
+                            </div>
+
+                            <div class="suggestion-title">
+                                Programming
+                            </div>
+
+                            <div class="suggestion-text">
+                                Learn coding easily
+                            </div>
+
+                        </div>
+
+
+                        <div
+                            class="suggestion"
+                            onclick="useSuggestion('Give me 10 Operating Systems interview questions')"
+                        >
+
+                            <div class="suggestion-icon">
+                                📝
+                            </div>
+
+                            <div class="suggestion-title">
+                                Practice
+                            </div>
+
+                            <div class="suggestion-text">
+                                Prepare for exams
+                            </div>
+
+                        </div>
+
+
+                        <div
+                            class="suggestion"
+                            onclick="useSuggestion('Create a study plan for my exams')"
+                        >
+
+                            <div class="suggestion-icon">
+                                🚀
+                            </div>
+
+                            <div class="suggestion-title">
+                                Study Plan
+                            </div>
+
+                            <div class="suggestion-text">
+                                Study smarter
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            `;
+
+
+            questionInput.focus();
+
+        }
+
+
+        function scrollToBottom() {
+
+            window.scrollTo({
+
+                top:
+                    document.documentElement.scrollHeight,
+
+                behavior: "smooth"
+
+            });
+
+        }
+
+
+        questionInput.focus();
+
+    </script>
+
+</body>
+
+</html>

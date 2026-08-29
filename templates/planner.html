@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>AI Study Planner</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            color: #222;
+        }
+
+        .container {
+            max-width: 850px;
+            margin: 40px auto;
+            padding: 25px;
+        }
+
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        label {
+            display: block;
+            margin-top: 18px;
+            margin-bottom: 7px;
+            font-weight: bold;
+        }
+
+        input,
+        select {
+            width: 100%;
+            padding: 13px;
+            border: 1px solid #ccc;
+            border-radius: 7px;
+            font-size: 15px;
+        }
+
+        button {
+            width: 100%;
+            margin-top: 25px;
+            padding: 14px;
+            border: none;
+            border-radius: 7px;
+            background: #222;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #444;
+        }
+
+        #loading {
+            display: none;
+            text-align: center;
+            margin-top: 25px;
+        }
+
+        #result {
+            margin-top: 25px;
+            padding: 20px;
+            background: #f7f7f7;
+            border-radius: 10px;
+            white-space: pre-wrap;
+            line-height: 1.7;
+        }
+
+        .error {
+            color: red;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="card">
+
+        <h1>📚 AI Study Planner</h1>
+
+        <p class="subtitle">
+            Create a personalized study plan using Ollama AI.
+        </p>
+
+        <form id="plannerForm">
+
+            <label for="subjects">
+                Subjects
+            </label>
+
+            <input
+                type="text"
+                id="subjects"
+                placeholder="Example: Python, DBMS, Java, DSA"
+                required
+            >
+
+            <label for="days">
+                Number of Days
+            </label>
+
+            <input
+                type="number"
+                id="days"
+                min="1"
+                max="30"
+                value="7"
+                required
+            >
+
+            <label for="hours">
+                Study Hours Per Day
+            </label>
+
+            <input
+                type="number"
+                id="hours"
+                min="1"
+                max="12"
+                value="2"
+                required
+            >
+
+            <label for="level">
+                Your Level
+            </label>
+
+            <select id="level">
+
+                <option value="Beginner">
+                    Beginner
+                </option>
+
+                <option value="Intermediate">
+                    Intermediate
+                </option>
+
+                <option value="Advanced">
+                    Advanced
+                </option>
+
+            </select>
+
+            <label for="exam">
+                Exam / Goal
+            </label>
+
+            <input
+                type="text"
+                id="exam"
+                placeholder="Example: Semester Exam"
+                value="Semester Exam"
+            >
+
+            <button type="submit">
+                🚀 Generate Study Plan
+            </button>
+
+        </form>
+
+        <div id="loading">
+            ⏳ Ollama is creating your study plan...
+        </div>
+
+        <div id="result"></div>
+
+    </div>
+
+</div>
+
+
+<script>
+
+document
+    .getElementById("plannerForm")
+    .addEventListener("submit", async function(event) {
+
+        event.preventDefault();
+
+        const subjects =
+            document.getElementById("subjects").value.trim();
+
+        const days =
+            document.getElementById("days").value;
+
+        const hours =
+            document.getElementById("hours").value;
+
+        const level =
+            document.getElementById("level").value;
+
+        const exam =
+            document.getElementById("exam").value.trim();
+
+        const loading =
+            document.getElementById("loading");
+
+        const result =
+            document.getElementById("result");
+
+
+        if (!subjects) {
+
+            result.innerHTML =
+                '<p class="error">Please enter your subjects.</p>';
+
+            return;
+        }
+
+
+        loading.style.display = "block";
+
+        result.innerHTML = "";
+
+
+        try {
+
+            const response = await fetch(
+                "/api/study-plan",
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        subjects: subjects,
+                        days: days,
+                        hours: hours,
+                        level: level,
+                        exam: exam
+                    })
+                }
+            );
+
+
+            const data = await response.json();
+
+
+            loading.style.display = "none";
+
+
+            if (data.error) {
+
+                result.innerHTML =
+                    `<p class="error">❌ ${data.error}</p>`;
+
+                return;
+            }
+
+
+            result.textContent = data.plan;
+
+        }
+
+        catch (error) {
+
+            loading.style.display = "none";
+
+            result.innerHTML =
+                `<p class="error">
+                    ❌ Connection error: ${error}
+                </p>`;
+
+        }
+
+    });
+
+</script>
+
+</body>
+
+</html>

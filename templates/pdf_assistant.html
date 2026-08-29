@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PDF Assignment - AI Study Assistant</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+        }
+
+        .box {
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            padding: 25px;
+            margin-top: 20px;
+        }
+
+        input {
+            margin: 15px 0;
+        }
+
+        button {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 6px;
+            border: 1px solid #888;
+        }
+
+        #loading {
+            display: none;
+            margin-top: 20px;
+        }
+
+        #result {
+            margin-top: 25px;
+            white-space: pre-wrap;
+            line-height: 1.6;
+        }
+
+        .error {
+            color: red;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>📚 PDF Assignment Generator</h1>
+
+    <p>
+        Upload your study PDF and Ollama will create an assignment
+        from the PDF.
+    </p>
+
+    <div class="box">
+
+        <form id="pdfForm">
+
+            <label>
+                <strong>Select PDF:</strong>
+            </label>
+
+            <br>
+
+            <input
+                type="file"
+                id="pdfFile"
+                name="pdf"
+                accept=".pdf"
+                required
+            >
+
+            <br>
+
+            <button type="submit">
+                Generate Assignment
+            </button>
+
+        </form>
+
+        <div id="loading">
+            ⏳ Reading PDF and generating assignment...
+        </div>
+
+        <div id="result"></div>
+
+    </div>
+
+
+    <script>
+
+        document
+            .getElementById("pdfForm")
+            .addEventListener("submit", async function(event) {
+
+                event.preventDefault();
+ 
+             const fileInput =
+                    document.getElementById("pdfFile");
+
+                const result =
+                    document.getElementById("result");
+
+                const loading =
+                    document.getElementById("loading");
+
+                if (!fileInput.files.length) {
+
+                    result.innerHTML =
+                        '<p class="error">Please select a PDF.</p>';
+
+                    return;
+                }
+
+                const formData = new FormData();
+
+                formData.append(
+                    "pdf",
+                    fileInput.files[0]
+                );
+
+                result.innerHTML = "";
+
+                loading.style.display = "block";
+
+                try {
+
+                    const response = await fetch(
+                        "/api/pdf-assignment",
+                        {
+                            method: "POST",
+                            body: formData
+                        }
+                    );
+
+                    const data = await response.json();
+
+                    loading.style.display = "none";
+
+                    if (data.error) {
+
+                        result.innerHTML =
+                            `<p class="error">${data.error}</p>`;
+
+                        return;
+                    }
+
+                    result.textContent = data.answer;
+
+                }
+
+                catch (error) {
+
+                    loading.style.display = "none";
+
+                    result.innerHTML =
+                        `<p class="error">
+                            Something went wrong:
+                            ${error}
+                        </p>`;
+                }
+
+            });
+
+    </script>
+
+</body>
+</html>

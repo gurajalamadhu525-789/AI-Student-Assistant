@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>AI Quiz</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 30px;
+        }
+
+        .container {
+            max-width: 850px;
+            margin: auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 15px 0;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+
+        button {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 6px;
+            background: #222;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #444;
+        }
+
+        #loading {
+            display: none;
+            margin-top: 20px;
+        }
+
+        #result {
+            margin-top: 25px;
+            white-space: pre-wrap;
+            line-height: 1.7;
+        }
+
+        .error {
+            color: red;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>AI Quiz Generator</h1>
+
+    <p>
+        Enter a topic and let Ollama generate a quiz for you.
+    </p>
+
+    <form id="quizForm">
+
+        <label>
+            <strong>Enter Topic</strong>
+        </label>
+
+        <input
+            type="text"
+            id="topic"
+            placeholder="Example: Python OOP"
+            required
+        >
+
+        <button type="submit">
+            Generate Quiz
+        </button>
+
+    </form>
+
+    <div id="loading">
+        Generating quiz... Please wait.
+    </div>
+
+    <div id="result"></div>
+
+</div>
+
+
+<script>
+
+document
+    .getElementById("quizForm")
+    .addEventListener("submit", async function(event) {
+
+        event.preventDefault();
+
+        const topic =
+            document.getElementById("topic").value.trim();
+
+        const result =
+            document.getElementById("result");
+
+        const loading =
+            document.getElementById("loading");
+
+        if (!topic) {
+            result.innerHTML =
+                '<p class="error">Please enter a topic.</p>';
+            return;
+        }
+
+        loading.style.display = "block";
+        result.innerHTML = "";
+
+        try {
+
+            const response = await fetch(
+                "/api/quiz",
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        topic: topic
+                    })
+                }
+            );
+
+            const data = await response.json();
+
+            loading.style.display = "none";
+
+            if (data.error) {
+
+                result.innerHTML =
+                    `<p class="error">${data.error}</p>`;
+
+                return;
+            }
+
+            result.textContent = data.answer;
+
+        } catch (error) {
+
+            loading.style.display = "none";
+
+            result.innerHTML =
+                `<p class="error">
+                    Error connecting to AI:
+                    ${error}
+                </p>`;
+        }
+
+    });
+
+</script>
+
+</body>
+</html>

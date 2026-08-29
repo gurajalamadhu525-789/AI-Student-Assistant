@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>AI Student Assistant</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            color: white;
+        }
+
+        /* NAVBAR */
+
+        nav {
+            width: 100%;
+            padding: 20px 7%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .logo span {
+            color: #60a5fa;
+        }
+
+        nav a {
+            color: white;
+            text-decoration: none;
+            margin-left: 25px;
+            font-size: 15px;
+        }
+
+        nav a:hover {
+            color: #60a5fa;
+        }
+
+        /* HERO */
+
+        .hero {
+            text-align: center;
+            padding: 80px 20px 50px;
+        }
+
+        .hero h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        .hero h1 span {
+            color: #60a5fa;
+        }
+
+        .hero p {
+            max-width: 650px;
+            margin: auto;
+            color: #cbd5e1;
+            font-size: 18px;
+            line-height: 1.6;
+        }
+
+        .start-btn {
+            display: inline-block;
+            margin-top: 30px;
+            padding: 14px 30px;
+            background: #2563eb;
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+
+        .start-btn:hover {
+            background: #1d4ed8;
+            transform: translateY(-2px);
+        }
+
+        /* FEATURES */
+
+        .features {
+            width: 86%;
+            max-width: 1200px;
+            margin: 30px auto 80px;
+
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+        }
+
+        .card {
+            background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 30px 22px;
+            border-radius: 18px;
+            text-align: center;
+            transition: 0.3s;
+            backdrop-filter: blur(10px);
+        }
+
+        .card:hover {
+            transform: translateY(-8px);
+            border-color: #60a5fa;
+        }
+
+        .icon {
+            font-size: 40px;
+            margin-bottom: 15px;
+        }
+
+        .card h2 {
+            font-size: 20px;
+            margin-bottom: 12px;
+        }
+
+        .card p {
+            color: #cbd5e1;
+            line-height: 1.5;
+            font-size: 14px;
+        }
+
+        .card a {
+            display: inline-block;
+            margin-top: 20px;
+            color: #60a5fa;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        /* FOOTER */
+
+        footer {
+            text-align: center;
+            padding: 25px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            color: #94a3b8;
+        }
+
+        /* MOBILE */
+
+        @media (max-width: 900px) {
+            .features {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .hero h1 {
+                font-size: 38px;
+            }
+        }
+
+        @media (max-width: 600px) {
+
+            nav {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            nav a {
+                margin: 0 8px;
+            }
+
+            .features {
+                grid-template-columns: 1fr;
+            }
+
+            .hero {
+                padding-top: 50px;
+            }
+
+            .hero h1 {
+                font-size: 32px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- NAVBAR -->
+
+    <nav>
+
+        <div class="logo">
+            AI <span>Student Assistant</span>
+        </div>
+
+        <div>
+            <a href="/">Home</a>
+            <a href="/quiz">Quiz</a>
+            <a href="/planner">Planner</a>
+            <a href="/pdf">PDF Assistant</a>
+        </div>
+
+    </nav>
+
+
+    <!-- HERO SECTION -->
+
+    <section class="hero">
+
+        <h1>
+            Your Personal
+            <span>AI Student Assistant</span>
+        </h1>
+
+        <p>
+            Learn smarter, prepare better, and manage your studies
+            with the help of your personal AI-powered study assistant.
+        </p>
+
+        <a href="/chat" class="start-btn">
+            Start Learning
+        </a>
+
+    </section>
+
+
+    <!-- FEATURES -->
+
+    <section class="features">
+
+        <!-- AI ASSISTANT -->
+
+        <div class="card">
+
+            <div class="icon">💬</div>
+
+            <h2>AI Assistant</h2>
+
+            <p>
+                Ask questions and get instant explanations
+                from your AI study assistant.
+            </p>
+
+            <a href="/chat">
+                Open Assistant →
+            </a>
+
+        </div>
+
+
+        <!-- AI QUIZ -->
+
+        <div class="card">
+
+            <div class="icon">📝</div>
+
+            <h2>AI Quiz Generator</h2>
+
+            <p>
+                Enter a topic and generate an AI-powered
+                quiz for your exam preparation.
+            </p>
+
+            <a href="/quiz">
+                Generate Quiz →
+            </a>
+
+        </div>
+
+
+        <!-- STUDY PLANNER -->
+
+        <div class="card">
+
+            <div class="icon">📅</div>
+
+            <h2>Study Planner</h2>
+
+            <p>
+                Create a personalized study schedule
+                based on your subjects and available time.
+            </p>
+
+            <a href="/planner">
+                Create Plan →
+            </a>
+
+        </div>
+
+
+        <!-- PDF ASSISTANT -->
+
+        <div class="card">
+
+            <div class="icon">📄</div>
+
+            <h2>PDF Assistant</h2>
+
+            <p>
+                Upload your study PDF and use AI to
+                understand and work with its content.
+            </p>
+
+            <a href="/pdf">
+                Open PDF Assistant →
+            </a>
+
+        </div>
+
+    </section>
+
+
+    <!-- FOOTER -->
+
+    <footer>
+
+        © 2026 AI Student Assistant | Powered by Ollama
+
+    </footer>
+
+</body>
+</html>

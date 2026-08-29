@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>AI Student Assistant</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #07111f;
+            color: #ffffff;
+            min-height: 100vh;
+        }
+
+        /* ================= HEADER ================= */
+
+        .header {
+            height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 30px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            background: rgba(7,17,31,0.95);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: #00d084;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+        }
+
+        .brand-text h1 {
+            font-size: 18px;
+            margin-bottom: 3px;
+        }
+
+        .brand-text p {
+            font-size: 12px;
+            color: #8ea1b8;
+        }
+
+        .header-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .top-button {
+            border: none;
+            padding: 9px 15px;
+            border-radius: 8px;
+            background: #183047;
+            color: white;
+            cursor: pointer;
+        }
+
+        .top-button:hover {
+            background: #24435e;
+        }
+
+        /* ================= CHAT ================= */
+
+        .chat-container {
+            max-width: 950px;
+            margin: auto;
+            min-height: calc(100vh - 70px);
+            padding: 25px 20px 150px;
+        }
+
+        #messages {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+
+        .message {
+            display: flex;
+            gap: 14px;
+            max-width: 850px;
+        }
+
+        .message.user {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+
+        .avatar {
+            width: 38px;
+            height: 38px;
+            min-width: 38px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .assistant .avatar {
+            background: #00d084;
+        }
+
+        .user .avatar {
+            background: #1597ff;
+        }
+
+        .message-content {
+            max-width: 750px;
+        }
+
+        .name {
+            font-size: 13px;
+            font-weight: bold;
+            margin-bottom: 7px;
+            color: #b9c8d8;
+        }
+
+        .text {
+            line-height: 1.7;
+            font-size: 16px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .user .text {
+            background: #173b59;
+            padding: 12px 16px;
+            border-radius: 16px;
+        }
+
+        .assistant .text {
+            padding: 5px 0;
+        }
+
+        /* ================= CODE ================= */
+
+        .code {
+            background: #0b1624;
+            border: 1px solid #26384c;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 12px 0;
+            overflow-x: auto;
+            white-space: pre;
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        /* ================= TYPING ================= */
+
+        .typing {
+            display: flex;
+            gap: 5px;
+            padding: 8px 0;
+        }
+
+        .typing span {
+            width: 7px;
+            height: 7px;
+            background: #9db0c5;
+            border-radius: 50%;
+            animation: blink 1.2s infinite;
+        }
+
+        .typing span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes blink {
+            0%, 80%, 100% {
+                opacity: 0.25;
+            }
+
+            40% {
+                opacity: 1;
+            }
+        }
+
+        /* ================= INPUT ================= */
+
+        .input-wrapper {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: min(900px, calc(100% - 30px));
+            z-index: 20;
+        }
+
+        .input-box {
+            display: flex;
+            align-items: flex-end;
+            gap: 10px;
+            background: #17283a;
+            border: 1px solid #2c455d;
+            border-radius: 16px;
+            padding: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+        }
+
+        textarea {
+            flex: 1;
+            resize: none;
+            min-height: 48px;
+            max-height: 160px;
+            border: none;
+            outline: none;
+            background: transparent;
+            color: white;
+            font-size: 16px;
+            padding: 12px;
+            font-family: Arial, sans-serif;
+        }
+
+        textarea::placeholder {
+            color: #8295aa;
+        }
+
+        #sendButton {
+            width: 48px;
+            height: 48px;
+            border: none;
+            border-radius: 12px;
+            background: #00d084;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        #sendButton:hover {
+            background: #00b875;
+        }
+
+        #sendButton:disabled {
+            background: #536273;
+            cursor: not-allowed;
+        }
+
+        .footer-note {
+            text-align: center;
+            color: #718399;
+            font-size: 11px;
+            margin-top: 8px;
+        }
+
+        /* ================= WELCOME ================= */
+
+        .welcome {
+            text-align: center;
+            margin-top: 120px;
+            color: #d8e4ef;
+        }
+
+        .welcome-icon {
+            font-size: 50px;
+            margin-bottom: 15px;
+        }
+
+        .welcome h2 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .welcome p {
+            color: #8ea1b8;
+        }
+
+        @media (max-width: 600px) {
+
+            .header {
+                padding: 0 15px;
+            }
+
+            .chat-container {
+                padding-left: 12px;
+                padding-right: 12px;
+            }
+
+            .message {
+                max-width: 100%;
+            }
+
+            .message-content {
+                max-width: calc(100vw - 80px);
+            }
+
+            .brand-text h1 {
+                font-size: 15px;
+            }
+
+            .top-button {
+                padding: 8px 10px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ================= HEADER ================= -->
+
+    <header class="header">
+
+        <div class="brand">
+
+            <div class="logo">
+                🤖
+            </div>
+
+            <div class="brand-text">
+                <h1>AI Student Assistant</h1>
+                <p>ChatGPT-style study assistant</p>
+            </div>
+
+        </div>
+
+        <div class="header-buttons">
+
+            <button class="top-button" onclick="clearChat()">
+                🗑 Clear
+            </button>
+
+            <button class="top-button" onclick="window.location.href='/'">
+                ← Home
+            </button>
+
+        </div>
+
+    </header>
+
+
+    <!-- ================= CHAT ================= -->
+
+    <main class="chat-container">
+
+        <div id="messages">
+
+            <div class="welcome" id="welcome">
+
+                <div class="welcome-icon">
+                    🎓
+                </div>
+
+                <h2>How can I help you today?</h2>
+
+                <p>
+                    Ask me anything about your studies, coding, exams or assignments.
+                </p>
+
+            </div>
+
+        </div>
+
+    </main>
+
+
+    <!-- ================= INPUT ================= -->
+
+    <div class="input-wrapper">
+
+        <div class="input-box">
+
+            <textarea
+                id="question"
+                placeholder="Message AI Student Assistant..."
+                rows="1"
+            ></textarea>
+
+            <button
+                id="sendButton"
+                onclick="sendMessage()"
+                title="Send"
+            >
+                ➤
+            </button>
+
+        </div>
+
+        <div class="footer-note">
+            AI Student Assistant can make mistakes. Check important information.
+        </div>
+
+    </div>
+
+
+    <script>
+
+        // =====================================================
+        // CONVERSATION MEMORY
+        // =====================================================
+
+        let conversation = [];
+
+        let isGenerating = false;
+
+
+        // =====================================================
+        // ELEMENTS
+        // =====================================================
+
+        const questionInput =
+            document.getElementById("question");
+
+        const sendButton =
+            document.getElementById("sendButton");
+
+        const messagesContainer =
+            document.getElementById("messages");
+
+        const welcome =
+            document.getElementById("welcome");
+
+
+        // =====================================================
+        // ENTER KEY
+        // =====================================================
+
+        questionInput.addEventListener(
+            "keydown",
+            function(event) {
+
+                if (
+                    event.key === "Enter" &&
+                    !event.shiftKey
+                ) {
+
+                    event.preventDefault();
+
+                    sendMessage();
+
+                }
+
+            }
+        );
+
+
+        // =====================================================
+        // AUTO RESIZE TEXTAREA
+        // =====================================================
+
+        questionInput.addEventListener(
+            "input",
+            function() {
+
+                this.style.height = "auto";
+
+                this.style.height =
+                    Math.min(
+                        this.scrollHeight,
+                        160
+                    ) + "px";
+
+            }
+        );
+
+
+        // =====================================================
+        // ADD MESSAGE
+        // =====================================================
+
+        function addMessage(
+            role,
+            content = ""
+        ) {
+
+            if (welcome) {
+                welcome.style.display = "none";
+            }
+
+
+            const message =
+                document.createElement("div");
+
+            message.className =
+                "message " + role;
+
+
+            const avatar =
+                document.createElement("div");
+
+            avatar.className =
+                "avatar";
+
+            avatar.textContent =
+                role === "user"
+                    ? "👤"
+                    : "🤖";
+
+
+            const contentBox =
+                document.createElement("div");
+
+            contentBox.className =
+                "message-content";
+
+
+            const name =
+                document.createElement("div");
+
+            name.className =
+                "name";
+
+            name.textContent =
+                role === "user"
+                    ? "You"
+                    : "AI Student Assistant";
+
+
+            const text =
+                document.createElement("div");
+
+            text.className =
+                "text";
+
+            text.textContent =
+                content;
+
+
+            contentBox.appendChild(name);
+
+            contentBox.appendChild(text);
+
+            message.appendChild(avatar);
+
+            message.appendChild(contentBox);
+
+            messagesContainer.appendChild(message);
+
+
+            scrollToBottom();
+
+
+            return text;
+
+        }
+
+
+        // =====================================================
+        // TYPING INDICATOR
+        // =====================================================
+
+        function addTypingIndicator() {
+
+            const message =
+                document.createElement("div");
+
+            message.className =
+                "message assistant";
+
+            message.id =
+                "typingMessage";
+
+
+            const avatar =
+                document.createElement("div");
+
+            avatar.className =
+                "avatar";
+
+            avatar.textContent =
+                "🤖";
+
+
+            const contentBox =
+                document.createElement("div");
+
+            contentBox.className =
+                "message-content";
+
+
+            const name =
+                document.createElement("div");
+
+            name.className =
+                "name";
+
+            name.textContent =
+                "AI Student Assistant";
+
+
+            const typing =
+                document.createElement("div");
+
+            typing.className =
+                "typing";
+
+            typing.innerHTML =
+                "<span></span><span></span><span></span>";
+
+
+            contentBox.appendChild(name);
+
+            contentBox.appendChild(typing);
+
+            message.appendChild(avatar);
+
+            message.appendChild(contentBox);
+
+            messagesContainer.appendChild(message);
+
+
+            scrollToBottom();
+
+        }
+
+
+        // =====================================================
+        // REMOVE TYPING
+        // =====================================================
+
+        function removeTypingIndicator() {
+
+            const typing =
+                document.getElementById(
+                    "typingMessage"
+                );
+
+            if (typing) {
+                typing.remove();
+            }
+
+        }
+
+
+        // =====================================================
+        // SEND MESSAGE
+        // =====================================================
+
+        async function sendMessage() {
+
+            if (isGenerating) {
+                return;
+            }
+
+
+            const question =
+                questionInput.value.trim();
+
+
+            if (!question) {
+                return;
+            }
+
+
+            isGenerating = true;
+
+            sendButton.disabled = true;
+
+
+            // Save current history BEFORE adding
+            // the new question.
+
+            const history =
+                [...conversation];
+
+
+            // Show user's message
+
+            addMessage(
+                "user",
+                question
+            );
+
+
+            // Add user message to memory
+
+            conversation.push({
+
+                role: "user",
+
+                content: question
+
+            });
+
+
+            // Clear input
+
+            questionInput.value = "";
+
+            questionInput.style.height = "auto";
+
+
+            // Show typing
+
+            addTypingIndicator();
+
+
+            try {
+
+                const response =
+                    await fetch(
+                        "/api/assistant",
+                        {
+                            method: "POST",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json"
+                            },
+
+                            body: JSON.stringify({
+
+                                question:
+                                    question,
+
+                                history:
+                                    history
+
+                            })
+                        }
+                    );
+
+
+                // Check HTTP error
+
+                if (!response.ok) {
+
+                    let errorMessage =
+                        "Server error.";
+
+                    try {
+
+                        const errorData =
+                            await response.json();
+
+                        errorMessage =
+                            errorData.error ||
+                            errorMessage;
+
+                    } catch (e) {}
+
+                    throw new Error(
+                        errorMessage
+                    );
+
+                }
+
+
+                // Remove typing animation
+
+                removeTypingIndicator();
+
+
+                // Create empty assistant message
+
+                const assistantText =
+                    addMessage(
+                        "assistant",
+                        ""
+                    );
+
+
+                // =================================================
+                // READ STREAM
+                // =================================================
+
+                const reader =
+                    response.body.getReader();
+
+                const decoder =
+                    new TextDecoder(
+                        "utf-8"
+                    );
+
+
+                let buffer = "";
+
+                let fullAnswer = "";
+
+
+                while (true) {
+
+                    const {
+                        value,
+                        done
+                    } =
+                        await reader.read();
+
+
+                    if (done) {
+                        break;
+                    }
+
+
+                    buffer +=
+                        decoder.decode(
+                            value,
+                            {
+                                stream: true
+                            }
+                        );
+
+
+                    const lines =
+                        buffer.split("\n");
+
+
+                    // Keep incomplete line
+
+                    buffer =
+                        lines.pop();
+
+
+                    for (
+                        const line of lines
+                    ) {
+
+                        if (!line.trim()) {
+                            continue;
+                        }
+
+
+                        try {
+
+                            const data =
+                                JSON.parse(
+                                    line
+                                );
+
+
+                            if (data.error) {
+
+                                throw new Error(
+                                    data.error
+                                );
+
+                            }
+
+
+                            if (
+                                data.token
+                            ) {
+
+                                fullAnswer +=
+                                    data.token;
+
+
+                                assistantText.textContent =
+                                    fullAnswer;
+
+
+                                scrollToBottom();
+
+                            }
+
+                        } catch (parseError) {
+
+                            console.log(
+                                "Stream parse:",
+                                parseError
+                            );
+
+                        }
+
+                    }
+
+                }
+
+
+                // Process remaining buffer
+
+                if (buffer.trim()) {
+
+                    try {
+
+                        const data =
+                            JSON.parse(
+                                buffer
+                            );
+
+
+                        if (data.token) {
+
+                            fullAnswer +=
+                                data.token;
+
+                            assistantText.textContent =
+                                fullAnswer;
+
+                        }
+
+                    } catch (e) {}
+
+                }
+
+
+                // =================================================
+                // SAVE ASSISTANT RESPONSE
+                // =================================================
+
+                if (fullAnswer.trim()) {
+
+                    conversation.push({
+
+                        role: "assistant",
+
+                        content:
+                            fullAnswer
+
+                    });
+
+                }
+
+
+                scrollToBottom();
+
+
+            } catch (error) {
+
+                removeTypingIndicator();
+
+
+                addMessage(
+                    "assistant",
+                    "❌ " +
+                    error.message
+                );
+
+
+                console.error(
+                    "AI Error:",
+                    error
+                );
+
+            } finally {
+
+                isGenerating = false;
+
+                sendButton.disabled = false;
+
+                questionInput.focus();
+
+            }
+
+        }
+
+
+        // =====================================================
+        // CLEAR CHAT
+        // =====================================================
+
+        function clearChat() {
+
+            conversation = [];
+
+
+            messagesContainer.innerHTML = `
+
+                <div class="welcome" id="welcome">
+
+                    <div class="welcome-icon">
+                        🎓
+                    </div>
+
+                    <h2>
+                        How can I help you today?
+                    </h2>
+
+                    <p>
+                        Ask me anything about your
+                        studies, coding, exams or assignments.
+                    </p>
+
+                </div>
+
+            `;
+
+        }
+
+
+        // =====================================================
+        // SCROLL
+        // =====================================================
+
+        function scrollToBottom() {
+
+            window.scrollTo({
+
+                top:
+                    document.body.scrollHeight,
+
+                behavior:
+                    "smooth"
+
+            });
+
+        }
+
+    </script>
+
+</body>
+
+</html>
