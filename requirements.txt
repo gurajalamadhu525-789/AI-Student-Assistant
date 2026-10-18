@@ -1,4 +1,6 @@
+
 Flask
 requests
 pypdf
-ollamapip 
+gunicorn
+
