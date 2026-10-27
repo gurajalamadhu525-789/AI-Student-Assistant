@@ -1,619 +1,442 @@
-
-import os
 import json
-import logging
-from urllib.parse import urlparse
+import os
 
 import requests
 from flask import (
     Flask,
+    Response,
+    jsonify,
     render_template,
     request,
-    jsonify,
-    Response,
+    stream_with_context,
 )
 from pypdf import PdfReader
-from werkzeug.exceptions import RequestEntityTooLarge
 
 app = Flask(__name__, template_folder="templates")
 app.config["MAX_CONTENT_LENGTH"] = 15 * 1024 * 1024
 
-logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
-logger = logging.getLogger(__name__)
-
 # Ollama configuration
 OLLAMA_BASE_URL = os.getenv(
-    "OLLAMA_BASE_URL", ""
-).strip().rstrip("/")
+    "OLLAMA_BASE_URL", "http://localhost:11434"
+).rstrip("/")
 
-OLLAMA_MODEL = os.getenv(
-    "OLLAMA_MODEL", "qwen3:0.6b"
-).strip()
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:latest")
 
-OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "").strip()
-
-CONNECT_TIMEOUT = 10
-READ_TIMEOUT = 180
-MAX_HISTORY_MESSAGES = 12
-MAX_PROMPT_LENGTH = 12000
-MAX_PDF_TEXT_LENGTH = 30000
-
-SYSTEM_PROMPT = """
-You are an AI Student Assistant, similar to a helpful coding tutor.
-
-Help students with:
-- Python and other programming languages
-- College subjects and concepts
-- Coding errors and debugging
-- Interview preparation
-- Projects and study planning
-
-Give clear, direct answers. Start with the answer, then explain
-important details. Use short examples when helpful. For simple
-questions, keep answers short. For complex questions, explain
-step by step. Ask a clarifying question when necessary.
-Do not invent facts when you are unsure.
-"""
+OLLAMA_GENERATE_URL = f"{OLLAMA_BASE_URL}/api/generate"
+OLLAMA_CHAT_URL = f"{OLLAMA_BASE_URL}/api/chat"
 
 
-class AIServiceError(Exception):
-    """An expected error communicating with the AI service."""
-
-
-def get_ollama_chat_url():
-    if not OLLAMA_BASE_URL:
-        raise AIServiceError(
-            "AI is not configured. Set OLLAMA_BASE_URL."
-        )
-
-    parsed = urlparse(OLLAMA_BASE_URL)
-
-    if parsed.scheme not in ("https", "http") or not parsed.netloc:
-        raise AIServiceError(
-            "OLLAMA_BASE_URL must be a valid HTTP or HTTPS URL."
-        )
-
-    if parsed.hostname in ("localhost", "127.0.0.1", "::1"):
-        raise AIServiceError(
-            "The configured Ollama URL points to localhost. "
-            "Use a reachable Ollama server URL."
-        )
-
-    if not OLLAMA_MODEL:
-        raise AIServiceError("OLLAMA_MODEL is not configured.")
-
-    return f"{OLLAMA_BASE_URL}/api/chat"
-
-
-def ollama_headers():
-    headers = {"Content-Type": "application/json"}
-
-    if OLLAMA_API_KEY:
-        headers["Authorization"] = f"Bearer {OLLAMA_API_KEY}"
-
-    return headers
-
-
-def normalize_history(history):
-    if not isinstance(history, list):
-        return []
-
-    messages = []
-
-    for item in history[-MAX_HISTORY_MESSAGES:]:
-        if not isinstance(item, dict):
-            continue
-
-        role = item.get("role")
-        content = item.get("content", item.get("text", ""))
-
-        if role == "model":
-            role = "assistant"
-
-        if role not in ("user", "assistant"):
-            continue
-
-        if not isinstance(content, str):
-            continue
-
-        content = content.strip()
-
-        if content:
-            messages.append({
-                "role": role,
-                "content": content[:MAX_PROMPT_LENGTH],
-            })
-
-    return messages
-
-
-def build_payload(messages, max_output_tokens=500, stream=False):
-    return {
-        "model": OLLAMA_MODEL,
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            *messages,
-        ],
-        "stream": stream,
-        "keep_alive": "10m",
-        "think": False,
-        "options": {
-            "temperature": 0.5,
-            "num_predict": max_output_tokens,
+def ollama_generate(prompt, timeout=180):
+    response = requests.post(
+        OLLAMA_GENERATE_URL,
+        json={
+            "model": OLLAMA_MODEL,
+            "prompt": prompt,
+            "stream": False,
         },
-    }
-
-
-def ollama_chat(messages, max_output_tokens=1200):
-    """Generate a complete answer for quiz, PDF and planner APIs."""
-
-    url = get_ollama_chat_url()
-
-    try:
-        with requests.post(
-            url,
-            headers=ollama_headers(),
-            json=build_payload(
-                messages,
-                max_output_tokens=max_output_tokens,
-                stream=False,
-            ),
-            timeout=(CONNECT_TIMEOUT, READ_TIMEOUT),
-        ) as response:
-
-            if response.status_code in (401, 403):
-                raise AIServiceError(
-                    "The AI server rejected the request. "
-                    "Check its authentication settings."
-                )
-
-            if response.status_code == 404:
-                raise AIServiceError(
-                    "Ollama endpoint or model not found. "
-                    "Check OLLAMA_BASE_URL and OLLAMA_MODEL."
-                )
-
-            if response.status_code == 429:
-                raise AIServiceError(
-                    "The AI server is busy. Please try again."
-                )
-
-            if not response.ok:
-                logger.error(
-                    "Ollama returned HTTP %s: %s",
-                    response.status_code,
-                    response.text[:300],
-                )
-                raise AIServiceError(
-                    f"The AI server returned HTTP {response.status_code}."
-                )
-
-            try:
-                data = response.json()
-            except ValueError as exc:
-                raise AIServiceError(
-                    "The AI server returned invalid JSON."
-                ) from exc
-
-            if data.get("error"):
-                raise AIServiceError(str(data["error"]))
-
-            message = data.get("message", {})
-            answer = (
-                message.get("content", "")
-                if isinstance(message, dict)
-                else ""
-            )
-
-            if not isinstance(answer, str) or not answer.strip():
-                raise AIServiceError(
-                    "The AI returned an empty answer. Please try again."
-                )
-
-            return answer.strip()
-
-    except AIServiceError:
-        raise
-
-    except requests.exceptions.Timeout as exc:
-        raise AIServiceError(
-            "The AI took too long to respond. Please try again."
-        ) from exc
-
-    except requests.exceptions.RequestException as exc:
-        logger.warning("Ollama request failed: %s", exc)
-        raise AIServiceError(
-            "Cannot reach the AI server. Check Ollama and the tunnel."
-        ) from exc
-
-
-def ask_ai(prompt, max_output_tokens=1200):
-    if not isinstance(prompt, str) or not prompt.strip():
-        raise AIServiceError("Please enter a question.")
-
-    prompt = prompt.strip()[:MAX_PROMPT_LENGTH]
-
-    return ollama_chat(
-        [{"role": "user", "content": prompt}],
-        max_output_tokens=max_output_tokens,
+        timeout=timeout,
     )
+    response.raise_for_status()
+
+    answer = response.json().get("response", "").strip()
+
+    if not answer:
+        raise RuntimeError("Ollama returned an empty response.")
+
+    return answer
 
 
-# --------------------------------------------------
-# Page routes
-# --------------------------------------------------
+def ollama_error_message(error):
+    if isinstance(error, requests.exceptions.ConnectionError):
+        return (
+            "Cannot connect to Ollama. Check that Ollama is running "
+            "and OLLAMA_BASE_URL is correct."
+        )
+
+    if isinstance(error, requests.exceptions.Timeout):
+        return "Ollama took too long to respond. Please try again."
+
+    if isinstance(error, requests.exceptions.HTTPError):
+        status = (
+            error.response.status_code
+            if error.response is not None
+            else "unknown"
+        )
+        return f"Ollama returned HTTP {status}. Check the URL and model."
+
+    if isinstance(error, requests.exceptions.RequestException):
+        return f"Could not contact Ollama: {error}"
+
+    return str(error)
+
+
+# ---------------- HOME PAGE ----------------
 
 @app.route("/")
 def home():
     return render_template("index.html")
 
 
+# ---------------- ASSISTANT PAGE ----------------
+
 @app.route("/assistant")
-@app.route("/chat")
 def assistant_page():
     return render_template("chat.html")
 
 
-@app.route("/pdf-assistant")
-@app.route("/pdf")
-def pdf_assistant_page():
-    # Preserve support for either existing PDF template.
-    try:
-        return render_template("pdf_assistant.html")
-    except Exception:
-        return render_template("pdf.html")
+@app.route("/chat")
+def chat_page():
+    return render_template("chat.html")
 
+
+# ---------------- PDF ASSISTANT PAGE ----------------
+
+@app.route("/pdf-assistant")
+def pdf_assistant_page():
+    return render_template("pdf_assistant.html")
+
+
+@app.route("/pdf")
+def pdf_page():
+    return render_template("pdf_assistant.html")
+
+
+# ---------------- QUIZ PAGE ----------------
 
 @app.route("/quiz")
 def quiz_page():
     return render_template("quiz.html")
 
 
+# ---------------- STUDY PLANNER PAGE ----------------
+
 @app.route("/planner")
 def planner_page():
     return render_template("planner.html")
 
 
-# --------------------------------------------------
-# Streaming AI chat API
-# --------------------------------------------------
+# ---------------- AI ASSISTANT API ----------------
 
 @app.route("/api/assistant", methods=["POST"])
 def api_assistant():
-    data = request.get_json(silent=True)
+    data = request.get_json(silent=True) or {}
+    question = str(data.get("question", "")).strip()
 
-    if not isinstance(data, dict):
-        return jsonify({"error": "Send a valid JSON request."}), 400
-
-    question = data.get("question", data.get("message", ""))
-
-    if not isinstance(question, str) or not question.strip():
+    if not question:
         return jsonify({"error": "Please enter a question."}), 400
 
-    question = question.strip()
+    history = data.get("history", [])
 
-    if len(question) > MAX_PROMPT_LENGTH:
-        return jsonify({"error": "Your question is too long."}), 400
+    if not isinstance(history, list):
+        history = []
 
-    history = normalize_history(data.get("history", []))
-    messages = history + [{"role": "user", "content": question}]
+    system_message = """
+You are an intelligent AI Student Assistant.
+Answer directly using natural, friendly, simple English.
+Understand follow-up questions using conversation history.
+Explain difficult topics step by step.
+Give examples when useful.
+For coding questions, provide practical and correct code.
+Keep simple answers short and provide details when requested.
+If unsure, clearly say so.
+Do not claim you searched the web unless you actually did.
+"""
+
+    messages = [
+        {"role": "system", "content": system_message}
+    ]
+
+    for item in history[-20:]:
+        if not isinstance(item, dict):
+            continue
+
+        role = item.get("role")
+        content = item.get("content", "")
+
+        if (
+            role in ("user", "assistant")
+            and isinstance(content, str)
+            and content.strip()
+        ):
+            messages.append({
+                "role": role,
+                "content": content.strip(),
+            })
+
+    messages.append({
+        "role": "user",
+        "content": question,
+    })
 
     try:
-        url = get_ollama_chat_url()
-
-        upstream = requests.post(
-            url,
-            headers=ollama_headers(),
-            json=build_payload(
-                messages,
-                max_output_tokens=500,
-                stream=True,
-            ),
+        ollama_response = requests.post(
+            OLLAMA_CHAT_URL,
+            json={
+                "model": OLLAMA_MODEL,
+                "messages": messages,
+                "stream": True,
+                "options": {
+                    "temperature": 0.7,
+                    "num_predict": 600,
+                },
+            },
             stream=True,
-            timeout=(CONNECT_TIMEOUT, READ_TIMEOUT),
+            timeout=(10, 300),
         )
 
-        if not upstream.ok:
-            status = upstream.status_code
-            details = upstream.text[:300]
-            upstream.close()
+        ollama_response.raise_for_status()
 
-            logger.error(
-                "Ollama streaming returned HTTP %s: %s",
-                status,
-                details,
-            )
-
-            return jsonify({
-                "error": f"The AI server returned HTTP {status}."
-            }), 502
-
-    except AIServiceError as exc:
-        return jsonify({"error": str(exc)}), 502
-
-    except requests.exceptions.RequestException as exc:
-        logger.warning("Could not start AI stream: %s", exc)
+    except requests.exceptions.RequestException as error:
         return jsonify({
-            "error": "Could not connect to the AI server."
+            "error": ollama_error_message(error)
         }), 502
 
-    def generate():
+    @stream_with_context
+    def stream_tokens():
         try:
-            for line in upstream.iter_lines():
+            for line in ollama_response.iter_lines(
+                decode_unicode=True
+            ):
                 if not line:
                     continue
 
                 try:
-                    item = json.loads(line)
-                except json.JSONDecodeError:
+                    chunk = json.loads(line)
+                except (json.JSONDecodeError, TypeError):
                     continue
 
-                if item.get("error"):
-                    yield json.dumps({
-                        "error": str(item["error"])
-                    }) + "\n"
-                    break
-
-                message = item.get("message", {})
-                token = (
-                    message.get("content", "")
-                    if isinstance(message, dict)
-                    else ""
+                token = chunk.get("message", {}).get(
+                    "content", ""
                 )
 
                 if token:
-                    yield json.dumps(
-                        {"token": token},
-                        ensure_ascii=False,
-                    ) + "\n"
+                    yield (
+                        json.dumps(
+                            {"token": token},
+                            ensure_ascii=False,
+                        ) + "\n"
+                    )
 
-                if item.get("done"):
+                if chunk.get("done") is True:
                     break
 
-        except requests.exceptions.RequestException:
-            logger.exception("AI stream was interrupted.")
+        except GeneratorExit:
+            pass
+
+        except Exception as error:
             yield json.dumps({
-                "error": "The AI connection was interrupted."
-            }) + "\n"
+                "error": str(error)
+            }, ensure_ascii=False) + "\n"
 
         finally:
-            upstream.close()
+            ollama_response.close()
 
     return Response(
-        generate(),
-        content_type="application/x-ndjson; charset=utf-8",
+        stream_tokens(),
+        mimetype="application/x-ndjson",
         headers={
-            "Cache-Control": "no-cache, no-transform",
+            "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
         },
     )
 
 
-# --------------------------------------------------
-# Quiz API
-# --------------------------------------------------
+# ---------------- QUIZ API ----------------
 
 @app.route("/api/quiz", methods=["POST"])
 def api_quiz():
-    data = request.get_json(silent=True)
+    data = request.get_json(silent=True) or {}
+    topic = str(data.get("topic", "")).strip()
 
-    if not isinstance(data, dict):
-        return jsonify({"error": "Send a valid JSON request."}), 400
-
-    topic = data.get("topic", "")
-
-    if not isinstance(topic, str) or not topic.strip():
-        return jsonify({"error": "Please enter a quiz topic."}), 400
-
-    if len(topic) > 300:
-        return jsonify({"error": "The topic is too long."}), 400
+    if not topic:
+        return jsonify({"error": "Please enter a topic."}), 400
 
     prompt = f"""
-Create a practice quiz about: {topic.strip()}
+Create a quiz about: {topic}
 
-Generate 5 multiple-choice questions. For each question include:
-- The question
-- Four options labelled A, B, C, and D
-- The correct answer
-- A short explanation
+Generate exactly 5 multiple-choice questions.
+For each question include:
+1. The question
+2. Four options labelled A, B, C and D
+3. The correct answer
+4. A short explanation
 
-Keep the questions clear and appropriate for a student.
+Keep it simple and useful for a college student.
+Format the answer clearly.
 """
 
     try:
+        answer = ollama_generate(prompt, timeout=150)
+        return jsonify({"answer": answer})
+
+    except Exception as error:
+        app.logger.exception("Quiz API error")
         return jsonify({
-            "answer": ask_ai(prompt, max_output_tokens=1800)
-        })
-    except AIServiceError as exc:
-        logger.warning("Quiz generation failed: %s", exc)
-        return jsonify({"error": str(exc)}), 502
+            "error": ollama_error_message(error)
+        }), 502
 
 
-# --------------------------------------------------
-# Study planner API
-# --------------------------------------------------
+# ---------------- STUDY PLANNER API ----------------
 
 @app.route("/api/study-plan", methods=["POST"])
-def api_study_plan():
-    data = request.get_json(silent=True)
+def study_plan():
+    data = request.get_json(silent=True) or {}
 
-    if not isinstance(data, dict):
-        return jsonify({"error": "Send a valid JSON request."}), 400
+    subjects = str(data.get("subjects", "")).strip()
+    days = data.get("days", "")
+    hours = data.get("hours", "")
+    level = str(data.get("level", "Beginner")).strip()
+    exam = str(data.get("exam", "Regular Study")).strip()
 
-    subjects = data.get("subjects", "")
-    days = data.get("days", 7)
-    hours = data.get("hours", 2)
-
-    if isinstance(subjects, list):
-        subjects = ", ".join(
-            str(item).strip()
-            for item in subjects
-            if str(item).strip()
-        )
-
-    if not isinstance(subjects, str) or not subjects.strip():
-        return jsonify({"error": "Please enter your subjects."}), 400
-
-    try:
-        days = int(days)
-        hours = float(hours)
-    except (ValueError, TypeError):
+    if not subjects:
         return jsonify({
-            "error": "Days and study hours must be numbers."
+            "error": "Please enter your subjects."
         }), 400
 
-    if not 1 <= days <= 90:
-        return jsonify({"error": "Days must be between 1 and 90."}), 400
-
-    if not 0.5 <= hours <= 16:
+    if not str(days).strip():
         return jsonify({
-            "error": "Study hours must be between 0.5 and 16."
+            "error": "Please enter the number of days."
+        }), 400
+
+    if not str(hours).strip():
+        return jsonify({
+            "error": "Please enter study hours per day."
         }), 400
 
     prompt = f"""
-Create a practical study plan.
+Create a realistic and balanced study plan for a college student.
 
-Subjects: {subjects[:3000]}
-Duration: {days} days
-Available study time: {hours:g} hours per day
+Subjects: {subjects}
+Number of days: {days}
+Study hours per day: {hours}
+Student level: {level}
+Exam type: {exam}
 
-Include a day-by-day schedule, subject time allocation, short breaks,
-revision, practice, and a final review. Keep it realistic.
+Include:
+1. A day-by-day timetable
+2. Subjects and important topics
+3. Study time
+4. Practice questions
+5. Revision and short breaks
+6. Final revision
+7. Exam preparation tips
+
+Use simple English.
 """
 
     try:
+        plan = ollama_generate(prompt, timeout=150)
+        return jsonify({"plan": plan})
+
+    except Exception as error:
+        app.logger.exception("Study planner API error")
         return jsonify({
-            "plan": ask_ai(prompt, max_output_tokens=2000)
-        })
-    except AIServiceError as exc:
-        logger.warning("Study planner failed: %s", exc)
-        return jsonify({"error": str(exc)}), 502
+            "error": ollama_error_message(error)
+        }), 502
 
 
-# --------------------------------------------------
-# PDF assistant API
-# --------------------------------------------------
+# ---------------- PDF ASSIGNMENT API ----------------
 
 @app.route("/api/pdf-assignment", methods=["POST"])
-def api_pdf_assignment():
-    uploaded_file = request.files.get("pdf")
+def pdf_assignment():
+    if "pdf" not in request.files:
+        return jsonify({
+            "error": "Please upload a PDF file."
+        }), 400
 
-    if uploaded_file is None or not uploaded_file.filename:
-        return jsonify({"error": "Please choose a PDF file."}), 400
+    pdf_file = request.files["pdf"]
 
-    if not uploaded_file.filename.lower().endswith(".pdf"):
-        return jsonify({"error": "Only PDF files are supported."}), 400
+    if not pdf_file.filename:
+        return jsonify({
+            "error": "Please select a PDF file."
+        }), 400
+
+    if not pdf_file.filename.lower().endswith(".pdf"):
+        return jsonify({
+            "error": "Please upload a PDF file only."
+        }), 400
+
+    question = request.form.get("question", "").strip()
 
     try:
-        reader = PdfReader(uploaded_file.stream)
-
-        if reader.is_encrypted:
-            try:
-                decrypted = reader.decrypt("")
-            except Exception:
-                decrypted = 0
-
-            if not decrypted:
-                return jsonify({
-                    "error": "This PDF is password-protected."
-                }), 400
-
-        pages = []
+        reader = PdfReader(pdf_file)
+        extracted_pages = []
 
         for page in reader.pages:
-            try:
-                text = page.extract_text() or ""
-                if text:
-                    pages.append(text)
-            except Exception:
-                logger.warning("Could not extract a PDF page.")
+            page_text = page.extract_text() or ""
 
-        pdf_text = "\n".join(pages).strip()
+            if page_text:
+                extracted_pages.append(page_text)
+
+        pdf_text = "\n".join(extracted_pages).strip()
 
         if not pdf_text:
             return jsonify({
-                "error": "No readable text was found in this PDF."
+                "error": (
+                    "Could not extract text from this PDF. "
+                    "It may be a scanned PDF containing images."
+                )
             }), 400
 
-        pdf_text = pdf_text[:MAX_PDF_TEXT_LENGTH]
+        pdf_text = pdf_text[:30000]
 
-    except Exception:
-        logger.exception("PDF reading failed.")
-        return jsonify({
-            "error": "Unable to read this PDF. Try another PDF."
-        }), 400
-
-    instruction = request.form.get(
-        "question",
-        "Summarize this document and explain its important points.",
-    )
-
-    if not isinstance(instruction, str) or not instruction.strip():
-        instruction = (
-            "Summarize this document and explain its important points."
+        user_request = question or (
+            "Create an assignment and study guide from this material."
         )
 
-    prompt = f"""
-Student request:
-{instruction.strip()[:2000]}
+        prompt = f"""
+You are an AI Student Assistant.
+Use ONLY the PDF material below as the source.
 
-Document text:
---- DOCUMENT START ---
+User request: {user_request}
+
+Include when suitable:
+1. A suitable title and introduction
+2. Important questions
+3. Five short-answer questions
+4. Five long-answer questions
+5. Five multiple-choice questions with answers
+6. Important topics
+7. A simple summary
+8. Five study tips
+
+Answer specific questions using the PDF content.
+Do not add unrelated information.
+
+PDF CONTENT:
+-------------------------
 {pdf_text}
---- DOCUMENT END ---
-
-Answer using the document as your source. Explain clearly and do not
-invent information that is not in the document.
+-------------------------
 """
 
-    try:
+        answer = ollama_generate(prompt, timeout=240)
+
+        return jsonify({"answer": answer})
+
+    except Exception as error:
+        app.logger.exception("PDF assistant error")
         return jsonify({
-            "answer": ask_ai(prompt, max_output_tokens=2000)
-        })
-    except AIServiceError as exc:
-        logger.warning("PDF assistant failed: %s", exc)
-        return jsonify({"error": str(exc)}), 502
+            "error": ollama_error_message(error)
+        }), 502
 
 
-# --------------------------------------------------
-# Health and error handlers
-# --------------------------------------------------
+# ---------------- FILE SIZE ERROR ----------------
 
-@app.route("/health")
-def health():
-    configured = bool(OLLAMA_BASE_URL and OLLAMA_MODEL)
-
+@app.errorhandler(413)
+def file_too_large(_error):
     return jsonify({
-        "status": "ok",
-        "ai_configured": configured,
-        "model": OLLAMA_MODEL if configured else None,
-    })
-
-
-@app.errorhandler(RequestEntityTooLarge)
-def handle_large_upload(_error):
-    return jsonify({
-        "error": "Upload too large. Maximum size is 15 MB."
+        "error": "The PDF is too large. Maximum file size is 15 MB."
     }), 413
 
 
-@app.errorhandler(404)
-def handle_not_found(_error):
-    if request.path.startswith("/api/"):
-        return jsonify({"error": "API endpoint not found."}), 404
-    return "Page not found", 404
-
-
-@app.errorhandler(500)
-def handle_server_error(error):
-    logger.error("Unhandled Flask error: %s", error)
-
-    if request.path.startswith("/api/"):
-        return jsonify({"error": "Internal server error."}), 500
-
-    return "An internal server error occurred.", 500
-
+# ---------------- START FLASK SERVER ----------------
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", "10000"))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    port = int(os.environ.get("PORT", "5002"))
+
+    app.run(
+        host="0.0.0.0",
+        port=port,
+        debug=False,
+        threaded=True,
+    )
