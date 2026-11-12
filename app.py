@@ -18,18 +18,33 @@ app.config["MAX_CONTENT_LENGTH"] = 15 * 1024 * 1024
 
 # ── Google Gemini configuration ───────────────────────────────────────────────
 GEMINI_API_KEY  = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL    = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+
+# Verified list of supported generation models from Google API
+DEFAULT_MODELS = [
+    "gemini-flash-latest",
+    "gemini-flash-lite-latest",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-pro-latest",
+    "gemini-3.8-flash",
+]
+
+env_model = os.getenv("GEMINI_MODEL", "").strip()
+if env_model in DEFAULT_MODELS:
+    GEMINI_MODEL = env_model
+else:
+    GEMINI_MODEL = "gemini-flash-latest"
 
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 
 
-def _gemini_url(endpoint="generateContent"):
+def _gemini_url(model, endpoint="generateContent"):
     if not GEMINI_API_KEY:
         raise RuntimeError(
             "GEMINI_API_KEY environment variable is not set. "
             "Add it to your deployment environment."
         )
-    return f"{GEMINI_BASE_URL}/{GEMINI_MODEL}:{endpoint}?key={GEMINI_API_KEY}"
+    return f"{GEMINI_BASE_URL}/{model}:{endpoint}?key={GEMINI_API_KEY}"
 
 
 def _to_gemini_contents(messages):
@@ -44,36 +59,31 @@ def _to_gemini_contents(messages):
         elif role == "user":
             text = (system_text + "\n\n" + content).strip() if system_text else content
             contents.append({"role": "user", "parts": [{"text": text}]})
-            system_text = ""          # only prepend to first user turn
+            system_text = ""
         elif role == "assistant":
             contents.append({"role": "model", "parts": [{"text": content}]})
     return contents
 
 
-def gemini_generate(messages, timeout=180, max_tokens=1500):
-    """Non-streaming Gemini call with automatic retry & fallback on 503 high demand."""
+def gemini_generate(messages, timeout=120, max_tokens=1500):
+    """Non-streaming Gemini call with fallback across verified active models."""
     if not GEMINI_API_KEY:
         raise RuntimeError(
             "GEMINI_API_KEY environment variable is not set. "
             "Add it to your deployment environment."
         )
 
-    candidate_models = [
-        GEMINI_MODEL,
-        "gemini-3.8-flash-lite",
-        "gemini-3.8-pro",
-        "gemini-1.5-flash",
-    ]
-    models_to_try = []
-    for m in candidate_models:
-        if m and m not in models_to_try:
+    # Put the chosen model first, followed by verified fallbacks
+    models_to_try = [GEMINI_MODEL]
+    for m in DEFAULT_MODELS:
+        if m not in models_to_try:
             models_to_try.append(m)
 
     last_error = None
 
     for model in models_to_try:
-        url = f"{GEMINI_BASE_URL}/{model}:generateContent?key={GEMINI_API_KEY}"
-        for attempt in range(3):
+        url = _gemini_url(model, "generateContent")
+        for attempt in range(2):
             try:
                 response = requests.post(
                     url,
@@ -88,9 +98,9 @@ def gemini_generate(messages, timeout=180, max_tokens=1500):
                     timeout=timeout,
                 )
 
-                if response.status_code == 503:
-                    # Model overloaded, retry with backoff
-                    time.sleep(1.5 * (attempt + 1))
+                if response.status_code in (429, 503):
+                    # Rate limit or temporary high demand — wait briefly and retry
+                    time.sleep(1.0)
                     continue
 
                 response.raise_for_status()
@@ -98,12 +108,12 @@ def gemini_generate(messages, timeout=180, max_tokens=1500):
                 try:
                     return data["candidates"][0]["content"]["parts"][0]["text"].strip()
                 except (KeyError, IndexError, TypeError) as exc:
-                    raise RuntimeError(f"Unexpected Gemini response format: {data}") from exc
+                    raise RuntimeError(f"Unexpected response from {model}: {data}") from exc
 
             except requests.exceptions.HTTPError as err:
                 last_error = err
-                # If model not found (404) or overloaded (503), try next model
-                if response.status_code in (404, 503):
+                # If model is unavailable (404, 503, 403), try next fallback model
+                if response.status_code in (404, 403, 503):
                     break
                 raise
             except Exception as err:
