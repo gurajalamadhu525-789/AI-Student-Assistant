@@ -153,6 +153,26 @@ def ollama_error_message(error):                               # noqa: F811
     return gemini_error_message(error)
 
 
+@app.route("/api/models")
+def list_models():
+    if not GEMINI_API_KEY:
+        return jsonify({"error": "No GEMINI_API_KEY set"}), 500
+    try:
+        resp = requests.get(
+            f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}",
+            timeout=15,
+        )
+        data = resp.json()
+        models = [
+            m.get("name", "").replace("models/", "")
+            for m in data.get("models", [])
+            if "generateContent" in m.get("supportedGenerationMethods", [])
+        ]
+        return jsonify({"supported_models": models, "raw": data})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # ---------------- HOME PAGE ----------------
 
 @app.route("/")
