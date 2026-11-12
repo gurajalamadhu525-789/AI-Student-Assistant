@@ -15,44 +15,62 @@ from pypdf import PdfReader
 app = Flask(__name__, template_folder="templates")
 app.config["MAX_CONTENT_LENGTH"] = 15 * 1024 * 1024
 
-# ── OpenAI configuration ──────────────────────────────────────────────────────
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-OPENAI_MODEL   = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+# ── Google Gemini configuration ───────────────────────────────────────────────
+GEMINI_API_KEY  = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL    = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 
-OPENAI_CHAT_URL     = "https://api.openai.com/v1/chat/completions"
+GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 
-def _openai_headers():
-    if not OPENAI_API_KEY:
+
+def _gemini_url(endpoint="generateContent"):
+    if not GEMINI_API_KEY:
         raise RuntimeError(
-            "OPENAI_API_KEY environment variable is not set. "
+            "GEMINI_API_KEY environment variable is not set. "
             "Add it to your deployment environment."
         )
-    return {
-        "Authorization": f"Bearer {OPENAI_API_KEY}",
-        "Content-Type": "application/json",
-    }
+    return f"{GEMINI_BASE_URL}/{GEMINI_MODEL}:{endpoint}?key={GEMINI_API_KEY}"
 
 
-def openai_generate(messages, timeout=180, max_tokens=1500):
-    """Non-streaming OpenAI call. Returns the assistant text."""
+def _to_gemini_contents(messages):
+    """Convert OpenAI-style messages list to Gemini contents format."""
+    system_text = ""
+    contents = []
+    for msg in messages:
+        role = msg.get("role")
+        content = msg.get("content", "")
+        if role == "system":
+            system_text = content
+        elif role == "user":
+            text = (system_text + "\n\n" + content).strip() if system_text else content
+            contents.append({"role": "user", "parts": [{"text": text}]})
+            system_text = ""          # only prepend to first user turn
+        elif role == "assistant":
+            contents.append({"role": "model", "parts": [{"text": content}]})
+    return contents
+
+
+def gemini_generate(messages, timeout=180, max_tokens=1500):
+    """Non-streaming Gemini call. Returns the assistant text."""
     response = requests.post(
-        OPENAI_CHAT_URL,
-        headers=_openai_headers(),
+        _gemini_url("generateContent"),
+        headers={"Content-Type": "application/json"},
         json={
-            "model": OPENAI_MODEL,
-            "messages": messages,
-            "max_tokens": max_tokens,
-            "temperature": 0.7,
+            "contents": _to_gemini_contents(messages),
+            "generationConfig": {
+                "maxOutputTokens": max_tokens,
+                "temperature": 0.7,
+            },
         },
         timeout=timeout,
     )
     response.raise_for_status()
+    data = response.json()
     return (
-        response.json()["choices"][0]["message"]["content"].strip()
+        data["candidates"][0]["content"]["parts"][0]["text"].strip()
     )
 
 
-def openai_error_message(error):
+def gemini_error_message(error):
     if isinstance(error, RuntimeError):
         return str(error)
     if isinstance(error, requests.exceptions.ConnectionError):
@@ -71,15 +89,23 @@ def openai_error_message(error):
         except Exception:
             pass
         msg = body.get("error", {}).get("message", "")
-        return f"OpenAI returned HTTP {status}: {msg}" if msg else f"OpenAI returned HTTP {status}."
+        return f"AI error {status}: {msg}" if msg else f"AI error {status}."
     if isinstance(error, requests.exceptions.RequestException):
         return f"Could not contact the AI server: {error}"
     return str(error)
 
 
-# Keep old name as alias so the quiz / planner / PDF routes below work unchanged
-def ollama_error_message(error):          # noqa: F811
-    return openai_error_message(error)
+# Aliases so the rest of the routes work without changes
+def openai_generate(messages, timeout=180, max_tokens=1500):   # noqa: F811
+    return gemini_generate(messages, timeout=timeout, max_tokens=max_tokens)
+
+
+def openai_error_message(error):                               # noqa: F811
+    return gemini_error_message(error)
+
+
+def ollama_error_message(error):                               # noqa: F811
+    return gemini_error_message(error)
 
 
 # ---------------- HOME PAGE ----------------
@@ -169,61 +195,79 @@ def api_assistant():
 
     messages.append({"role": "user", "content": question})
 
-    # ── OpenAI streaming ──────────────────────────────────────────────
+    # ── Gemini streaming ──────────────────────────────────────────────
     try:
-        openai_resp = requests.post(
-            OPENAI_CHAT_URL,
-            headers=_openai_headers(),
+        gemini_resp = requests.post(
+            _gemini_url("streamGenerateContent"),
+            headers={"Content-Type": "application/json"},
             json={
-                "model": OPENAI_MODEL,
-                "messages": messages,
-                "stream": True,
-                "max_tokens": 800,
-                "temperature": 0.7,
+                "contents": _to_gemini_contents(messages),
+                "generationConfig": {
+                    "maxOutputTokens": 800,
+                    "temperature": 0.7,
+                },
             },
             stream=True,
             timeout=(10, 300),
         )
-        openai_resp.raise_for_status()
+        gemini_resp.raise_for_status()
 
     except RuntimeError as error:
         return jsonify({"error": str(error)}), 502
     except requests.exceptions.RequestException as error:
-        return jsonify({"error": openai_error_message(error)}), 502
+        return jsonify({"error": gemini_error_message(error)}), 502
 
     @stream_with_context
     def stream_tokens():
+        buffer = ""
         try:
-            for line in openai_resp.iter_lines(decode_unicode=True):
-                if not line or not line.startswith("data:"):
-                    continue
-
-                payload = line[len("data:"):].strip()
-                if payload == "[DONE]":
-                    break
-
-                try:
-                    chunk = json.loads(payload)
-                except (json.JSONDecodeError, TypeError):
-                    continue
-
-                token = (
-                    chunk.get("choices", [{}])[0]
-                    .get("delta", {})
-                    .get("content", "")
-                )
-                if token:
-                    yield (
-                        json.dumps({"token": token}, ensure_ascii=False)
-                        + "\n"
-                    )
+            for chunk in gemini_resp.iter_content(chunk_size=None, decode_unicode=True):
+                buffer += chunk
+                # Gemini streams a JSON array — parse complete objects as they arrive
+                while True:
+                    start = buffer.find('"text":')
+                    if start == -1:
+                        break
+                    # find the string value after "text":
+                    q1 = buffer.find('"', start + 7)
+                    if q1 == -1:
+                        break
+                    q2 = q1 + 1
+                    text = ""
+                    while q2 < len(buffer):
+                        c = buffer[q2]
+                        if c == "\\" and q2 + 1 < len(buffer):
+                            esc = buffer[q2 + 1]
+                            if esc == "n":
+                                text += "\n"
+                            elif esc == "t":
+                                text += "\t"
+                            elif esc == '"':
+                                text += '"'
+                            elif esc == "\\":
+                                text += "\\"
+                            else:
+                                text += esc
+                            q2 += 2
+                        elif c == '"':
+                            break
+                        else:
+                            text += c
+                            q2 += 1
+                    else:
+                        break   # incomplete string — wait for more data
+                    buffer = buffer[q2 + 1:]
+                    if text:
+                        yield (
+                            json.dumps({"token": text}, ensure_ascii=False) + "\n"
+                        )
 
         except GeneratorExit:
             pass
         except Exception as error:
             yield json.dumps({"error": str(error)}, ensure_ascii=False) + "\n"
         finally:
-            openai_resp.close()
+            gemini_resp.close()
 
     return Response(
         stream_tokens(),
