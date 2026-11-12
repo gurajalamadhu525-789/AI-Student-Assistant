@@ -328,16 +328,16 @@ Format the answer clearly.
 """
 
     try:
-        answer = openai_generate(
+        answer = gemini_generate(
             [{"role": "user", "content": prompt}],
-            timeout=150,
-            max_tokens=1200,
+            timeout=60,
+            max_tokens=800,
         )
         return jsonify({"answer": answer})
 
     except Exception as error:
         app.logger.exception("Quiz API error")
-        return jsonify({"error": openai_error_message(error)}), 502
+        return jsonify({"error": gemini_error_message(error)}), 502
 
 
 # ---------------- STUDY PLANNER API ----------------
@@ -389,16 +389,16 @@ Use simple English.
 """
 
     try:
-        plan = openai_generate(
+        plan = gemini_generate(
             [{"role": "user", "content": prompt}],
-            timeout=150,
-            max_tokens=1500,
+            timeout=60,
+            max_tokens=1000,
         )
         return jsonify({"plan": plan})
 
     except Exception as error:
         app.logger.exception("Study planner API error")
-        return jsonify({"error": openai_error_message(error)}), 502
+        return jsonify({"error": gemini_error_message(error)}), 502
 
 
 # ---------------- PDF ASSIGNMENT API ----------------
@@ -475,19 +475,17 @@ PDF CONTENT:
 -------------------------
 """
 
-        answer = openai_generate(
+        answer = gemini_generate(
             [{"role": "user", "content": prompt}],
-            timeout=240,
-            max_tokens=2000,
+            timeout=90,
+            max_tokens=1200,
         )
 
         return jsonify({"answer": answer})
 
     except Exception as error:
         app.logger.exception("PDF assistant error")
-        return jsonify({
-            "error": ollama_error_message(error)
-        }), 502
+        return jsonify({"error": gemini_error_message(error)}), 502
 
 
 # ---------------- FILE SIZE ERROR ----------------

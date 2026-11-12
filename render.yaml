@@ -3,7 +3,7 @@ services:
     name: ai-student-assistant
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    startCommand: gunicorn --timeout 120 app:app
     envVars:
       - key: OPENAI_API_KEY
         sync: false
