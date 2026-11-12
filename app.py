@@ -15,59 +15,71 @@ from pypdf import PdfReader
 app = Flask(__name__, template_folder="templates")
 app.config["MAX_CONTENT_LENGTH"] = 15 * 1024 * 1024
 
-# Ollama configuration
-OLLAMA_BASE_URL = os.getenv(
-    "OLLAMA_BASE_URL", "http://localhost:11434"
-).rstrip("/")
+# ── OpenAI configuration ──────────────────────────────────────────────────────
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_MODEL   = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:latest")
+OPENAI_CHAT_URL     = "https://api.openai.com/v1/chat/completions"
 
-OLLAMA_GENERATE_URL = f"{OLLAMA_BASE_URL}/api/generate"
-OLLAMA_CHAT_URL = f"{OLLAMA_BASE_URL}/api/chat"
+def _openai_headers():
+    if not OPENAI_API_KEY:
+        raise RuntimeError(
+            "OPENAI_API_KEY environment variable is not set. "
+            "Add it to your deployment environment."
+        )
+    return {
+        "Authorization": f"Bearer {OPENAI_API_KEY}",
+        "Content-Type": "application/json",
+    }
 
 
-def ollama_generate(prompt, timeout=180):
+def openai_generate(messages, timeout=180, max_tokens=1500):
+    """Non-streaming OpenAI call. Returns the assistant text."""
     response = requests.post(
-        OLLAMA_GENERATE_URL,
+        OPENAI_CHAT_URL,
+        headers=_openai_headers(),
         json={
-            "model": OLLAMA_MODEL,
-            "prompt": prompt,
-            "stream": False,
+            "model": OPENAI_MODEL,
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "temperature": 0.7,
         },
         timeout=timeout,
     )
     response.raise_for_status()
-
-    answer = response.json().get("response", "").strip()
-
-    if not answer:
-        raise RuntimeError("Ollama returned an empty response.")
-
-    return answer
+    return (
+        response.json()["choices"][0]["message"]["content"].strip()
+    )
 
 
-def ollama_error_message(error):
+def openai_error_message(error):
+    if isinstance(error, RuntimeError):
+        return str(error)
     if isinstance(error, requests.exceptions.ConnectionError):
-        return (
-            "Cannot connect to Ollama. Check that Ollama is running "
-            "and OLLAMA_BASE_URL is correct."
-        )
-
+        return "Cannot connect to the AI server. Please try again."
     if isinstance(error, requests.exceptions.Timeout):
-        return "Ollama took too long to respond. Please try again."
-
+        return "The AI server took too long to respond. Please try again."
     if isinstance(error, requests.exceptions.HTTPError):
         status = (
             error.response.status_code
             if error.response is not None
             else "unknown"
         )
-        return f"Ollama returned HTTP {status}. Check the URL and model."
-
+        body = {}
+        try:
+            body = error.response.json()
+        except Exception:
+            pass
+        msg = body.get("error", {}).get("message", "")
+        return f"OpenAI returned HTTP {status}: {msg}" if msg else f"OpenAI returned HTTP {status}."
     if isinstance(error, requests.exceptions.RequestException):
-        return f"Could not contact Ollama: {error}"
-
+        return f"Could not contact the AI server: {error}"
     return str(error)
+
+
+# Keep old name as alias so the quiz / planner / PDF routes below work unchanged
+def ollama_error_message(error):          # noqa: F811
+    return openai_error_message(error)
 
 
 # ---------------- HOME PAGE ----------------
@@ -130,106 +142,88 @@ def api_assistant():
     if not isinstance(history, list):
         history = []
 
-    system_message = """
-You are an intelligent AI Student Assistant.
-Answer directly using natural, friendly, simple English.
-Understand follow-up questions using conversation history.
-Explain difficult topics step by step.
-Give examples when useful.
-For coding questions, provide practical and correct code.
-Keep simple answers short and provide details when requested.
-If unsure, clearly say so.
-Do not claim you searched the web unless you actually did.
-"""
+    system_message = (
+        "You are an intelligent AI Student Assistant. "
+        "Answer directly using natural, friendly, simple English. "
+        "Understand follow-up questions using conversation history. "
+        "Explain difficult topics step by step. "
+        "Give examples when useful. "
+        "For coding questions, provide practical and correct code. "
+        "Keep simple answers short and provide details when requested. "
+        "If unsure, clearly say so."
+    )
 
-    messages = [
-        {"role": "system", "content": system_message}
-    ]
+    messages = [{"role": "system", "content": system_message}]
 
     for item in history[-20:]:
         if not isinstance(item, dict):
             continue
-
         role = item.get("role")
         content = item.get("content", "")
-
         if (
             role in ("user", "assistant")
             and isinstance(content, str)
             and content.strip()
         ):
-            messages.append({
-                "role": role,
-                "content": content.strip(),
-            })
+            messages.append({"role": role, "content": content.strip()})
 
-    messages.append({
-        "role": "user",
-        "content": question,
-    })
+    messages.append({"role": "user", "content": question})
 
+    # ── OpenAI streaming ──────────────────────────────────────────────
     try:
-        ollama_response = requests.post(
-            OLLAMA_CHAT_URL,
+        openai_resp = requests.post(
+            OPENAI_CHAT_URL,
+            headers=_openai_headers(),
             json={
-                "model": OLLAMA_MODEL,
+                "model": OPENAI_MODEL,
                 "messages": messages,
                 "stream": True,
-                "options": {
-                    "temperature": 0.7,
-                    "num_predict": 600,
-                },
+                "max_tokens": 800,
+                "temperature": 0.7,
             },
             stream=True,
             timeout=(10, 300),
         )
+        openai_resp.raise_for_status()
 
-        ollama_response.raise_for_status()
-
+    except RuntimeError as error:
+        return jsonify({"error": str(error)}), 502
     except requests.exceptions.RequestException as error:
-        return jsonify({
-            "error": ollama_error_message(error)
-        }), 502
+        return jsonify({"error": openai_error_message(error)}), 502
 
     @stream_with_context
     def stream_tokens():
         try:
-            for line in ollama_response.iter_lines(
-                decode_unicode=True
-            ):
-                if not line:
+            for line in openai_resp.iter_lines(decode_unicode=True):
+                if not line or not line.startswith("data:"):
                     continue
 
+                payload = line[len("data:"):].strip()
+                if payload == "[DONE]":
+                    break
+
                 try:
-                    chunk = json.loads(line)
+                    chunk = json.loads(payload)
                 except (json.JSONDecodeError, TypeError):
                     continue
 
-                token = chunk.get("message", {}).get(
-                    "content", ""
+                token = (
+                    chunk.get("choices", [{}])[0]
+                    .get("delta", {})
+                    .get("content", "")
                 )
-
                 if token:
                     yield (
-                        json.dumps(
-                            {"token": token},
-                            ensure_ascii=False,
-                        ) + "\n"
+                        json.dumps({"token": token}, ensure_ascii=False)
+                        + "\n"
                     )
-
-                if chunk.get("done") is True:
-                    break
 
         except GeneratorExit:
             pass
-
         except Exception as error:
-            yield json.dumps({
-                "error": str(error)
-            }, ensure_ascii=False) + "\n"
-
+            yield json.dumps({"error": str(error)}, ensure_ascii=False) + "\n"
         finally:
-            ollama_response.close()
+            openai_resp.close()
 
     return Response(
         stream_tokens(),
@@ -266,14 +260,16 @@ Format the answer clearly.
 """
 
     try:
-        answer = ollama_generate(prompt, timeout=150)
+        answer = openai_generate(
+            [{"role": "user", "content": prompt}],
+            timeout=150,
+            max_tokens=1200,
+        )
         return jsonify({"answer": answer})
 
     except Exception as error:
         app.logger.exception("Quiz API error")
-        return jsonify({
-            "error": ollama_error_message(error)
-        }), 502
+        return jsonify({"error": openai_error_message(error)}), 502
 
 
 # ---------------- STUDY PLANNER API ----------------
@@ -325,14 +321,16 @@ Use simple English.
 """
 
     try:
-        plan = ollama_generate(prompt, timeout=150)
+        plan = openai_generate(
+            [{"role": "user", "content": prompt}],
+            timeout=150,
+            max_tokens=1500,
+        )
         return jsonify({"plan": plan})
 
     except Exception as error:
         app.logger.exception("Study planner API error")
-        return jsonify({
-            "error": ollama_error_message(error)
-        }), 502
+        return jsonify({"error": openai_error_message(error)}), 502
 
 
 # ---------------- PDF ASSIGNMENT API ----------------
@@ -409,7 +407,11 @@ PDF CONTENT:
 -------------------------
 """
 
-        answer = ollama_generate(prompt, timeout=240)
+        answer = openai_generate(
+            [{"role": "user", "content": prompt}],
+            timeout=240,
+            max_tokens=2000,
+        )
 
         return jsonify({"answer": answer})
 

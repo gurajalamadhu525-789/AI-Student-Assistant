@@ -1,0 +1,213 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#090b18">
+  <title>AI Student Assistant</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+</head>
+<body data-page="{{ page }}">
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <a href="/" class="brand">
+        <span class="brand-icon">✦</span>
+        <span>Study<span class="gradient-text">AI</span><small>STUDENT WORKSPACE</small></span>
+      </a>
+
+      <div class="nav-label">WORKSPACE</div>
+      <nav class="navigation">
+        <a href="/" data-nav="home"><span>⌂</span> Dashboard</a>
+        <a href="/assistant" data-nav="assistant"><span>✧</span> AI Assistant</a>
+        <a href="/quiz" data-nav="quiz"><span>▤</span> Quiz Generator</a>
+        <a href="/planner" data-nav="planner"><span>▦</span> Study Planner</a>
+        <a href="/pdf-assistant" data-nav="pdf"><span>▧</span> PDF Assistant</a>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <div class="status-card">
+          <span class="status-dot"></span>
+          <div><strong>AI workspace</strong><small>Ollama powered</small></div>
+        </div>
+        <p class="sidebar-footer">Built for learning. Designed for you.</p>
+      </div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar">
+        <button class="icon-button mobile-menu" id="menuButton"
+                aria-label="Open navigation">☰</button>
+        <div class="breadcrumb">Workspace <span>/</span> <strong id="pageName">Dashboard</strong></div>
+        <div class="topbar-right"><span class="live-dot"></span> AI workspace</div>
+      </header>
+
+      <div class="content">
+        <!-- DASHBOARD -->
+        <section data-view="home" class="page-view">
+          <div class="hero">
+            <div class="hero-copy">
+              <span class="eyebrow"><span class="live-dot"></span> YOUR PERSONAL LEARNING SPACE</span>
+              <h1>Learn smarter.<br><span class="gradient-text">Build your future.</span></h1>
+              <p>Your AI study partner for coding, college subjects, exam preparation and projects.</p>
+              <a class="primary-button" href="/assistant">Start learning <span>→</span></a>
+            </div>
+            <div class="hero-art" aria-hidden="true">
+              <div class="orbit orbit-one"></div>
+              <div class="orbit orbit-two"></div>
+              <div class="core">✦</div>
+              <span class="float-chip chip-one">AI ✧</span>
+              <span class="float-chip chip-two">0101</span>
+              <span class="float-chip chip-three">Learn</span>
+            </div>
+          </div>
+
+          <div class="section-heading">
+            <div><span class="eyebrow">YOUR TOOLKIT</span><h2>What would you like to do?</h2></div>
+          </div>
+
+          <div class="feature-grid">
+            <a class="feature-card purple-card" href="/assistant">
+              <span class="feature-icon">✧</span><span class="card-arrow">↗</span>
+              <h3>AI Assistant</h3>
+              <p>Ask questions, learn concepts and get help with code.</p>
+              <span class="card-link">Start a conversation →</span>
+            </a>
+            <a class="feature-card blue-card" href="/quiz">
+              <span class="feature-icon">▤</span><span class="card-arrow">↗</span>
+              <h3>Quiz Generator</h3>
+              <p>Generate practice questions for your next study session.</p>
+              <span class="card-link">Create a quiz →</span>
+            </a>
+            <a class="feature-card pink-card" href="/planner">
+              <span class="feature-icon">▦</span><span class="card-arrow">↗</span>
+              <h3>Study Planner</h3>
+              <p>Organize subjects into a practical study schedule.</p>
+              <span class="card-link">Plan your week →</span>
+            </a>
+            <a class="feature-card cyan-card" href="/pdf-assistant">
+              <span class="feature-icon">▧</span><span class="card-arrow">↗</span>
+              <h3>PDF Assistant</h3>
+              <p>Understand notes and documents with AI assistance.</p>
+              <span class="card-link">Explore a document →</span>
+            </a>
+          </div>
+
+          <div class="tip-panel">
+            <span class="tip-icon">✦</span>
+            <div><strong>A little progress every day adds up.</strong>
+              <p>Choose a topic, ask questions, practice, and keep learning.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- AI CHAT -->
+        <section data-view="assistant" class="page-view">
+          <div class="page-heading">
+            <span class="eyebrow">YOUR AI LEARNING PARTNER</span>
+            <h1>AI <span class="gradient-text">Assistant</span></h1>
+            <p>Ask about Python, college subjects, coding errors or interviews.</p>
+          </div>
+          <div class="workspace-card chat-card">
+            <div class="chat-toolbar"><span class="live-dot"></span> AI Tutor <span class="muted">· Powered by Ollama</span>
+              <button id="clearChat" class="text-button">New chat ↻</button>
+            </div>
+            <div id="chatMessages" class="chat-messages" aria-live="polite">
+              <div class="welcome-message">
+                <div class="welcome-icon">✦</div>
+                <h2>What are we learning today?</h2>
+                <p>Choose a suggestion or type your own question.</p>
+                <div class="suggestions">
+                  <button class="suggestion" data-prompt="Explain Python variables with examples.">Explain Python variables</button>
+                  <button class="suggestion" data-prompt="Help me debug a Python error.">Debug my code</button>
+                  <button class="suggestion" data-prompt="Give me beginner software interview preparation tips.">Interview preparation</button>
+                </div>
+              </div>
+            </div>
+            <form id="chatForm" class="chat-form">
+              <textarea id="chatInput" rows="1" maxlength="12000"
+                        placeholder="Ask anything about your studies..." required></textarea>
+              <button class="send-button" type="submit" aria-label="Send message">↑</button>
+              <div class="input-note">AI can make mistakes. Verify important information.</div>
+            </form>
+          </div>
+        </section>
+
+        <!-- QUIZ -->
+        <section data-view="quiz" class="page-view">
+          <div class="page-heading">
+            <span class="eyebrow">PRACTICE MAKES PROGRESS</span>
+            <h1>Quiz <span class="gradient-text">Generator</span></h1>
+            <p>Turn any topic into a practice quiz with AI.</p>
+          </div>
+          <div class="workspace-card form-card">
+            <div class="form-icon">▤</div>
+            <h2>Create your quiz</h2>
+            <p>Enter a subject or concept you want to practice.</p>
+            <form id="quizForm" class="stack-form">
+              <label for="quizTopic">Quiz topic</label>
+              <input id="quizTopic" maxlength="300" required
+                     placeholder="e.g. Python loops, DBMS, Data structures">
+              <button class="primary-button" type="submit">✦ Generate quiz</button>
+            </form>
+          </div>
+          <div id="quizResult" class="result-panel" hidden></div>
+        </section>
+
+        <!-- STUDY PLANNER -->
+        <section data-view="planner" class="page-view">
+          <div class="page-heading">
+            <span class="eyebrow">YOUR TIME, YOUR GOALS</span>
+            <h1>Study <span class="gradient-text">Planner</span></h1>
+            <p>Create a manageable plan around your subjects and available time.</p>
+          </div>
+          <div class="workspace-card form-card">
+            <div class="form-icon">▦</div>
+            <h2>Design your study plan</h2>
+            <form id="plannerForm" class="stack-form">
+              <label for="subjects">Subjects</label>
+              <textarea id="subjects" rows="3" required
+                        placeholder="Python, DBMS, Operating Systems..."></textarea>
+              <div class="two-columns">
+                <div><label for="days">Duration (days)</label>
+                  <input id="days" type="number" min="1" max="90" value="7" required></div>
+                <div><label for="hours">Study hours per day</label>
+                  <input id="hours" type="number" min="0.5" max="16" step="0.5" value="2" required></div>
+              </div>
+              <button class="primary-button" type="submit">✦ Build my study plan</button>
+            </form>
+          </div>
+          <div id="plannerResult" class="result-panel" hidden></div>
+        </section>
+
+        <!-- PDF ASSISTANT -->
+        <section data-view="pdf" class="page-view">
+          <div class="page-heading">
+            <span class="eyebrow">MAKE YOUR NOTES WORK FOR YOU</span>
+            <h1>PDF <span class="gradient-text">Assistant</span></h1>
+            <p>Upload a text-readable PDF and ask questions about its contents.</p>
+          </div>
+          <div class="workspace-card form-card">
+            <div class="form-icon">▧</div>
+            <h2>Ask your document</h2>
+            <p>PDF files up to 15 MB are supported.</p>
+            <form id="pdfForm" class="stack-form">
+              <label for="pdfFile">Choose a PDF file</label>
+              <input id="pdfFile" type="file" accept="application/pdf,.pdf" required>
+              <label for="pdfQuestion">What would you like to know?</label>
+              <textarea id="pdfQuestion" rows="3"
+                        placeholder="Summarize this document and explain the important points."></textarea>
+              <button class="primary-button" type="submit">✦ Analyze PDF</button>
+            </form>
+          </div>
+          <div id="pdfResult" class="result-panel" hidden></div>
+        </section>
+
+        <footer class="site-footer">StudyAI <span>·</span> Your learning journey, powered by AI.</footer>
+      </div>
+    </main>
+  </div>
+  <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>
