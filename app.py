@@ -460,13 +460,22 @@ PDF CONTENT:
         return jsonify({"error": gemini_error_message(error)}), 502
 
 
-# ---------------- FILE SIZE ERROR ----------------
+# ---------------- ERROR HANDLERS ----------------
 
 @app.errorhandler(413)
 def file_too_large(_error):
     return jsonify({
         "error": "The PDF is too large. Maximum file size is 15 MB."
     }), 413
+
+
+@app.errorhandler(Exception)
+def handle_any_exception(e):
+    app.logger.exception("Unhandled server error")
+    return jsonify({
+        "error": str(e),
+        "traceback": traceback.format_exc(),
+    }), 500
 
 
 # ---------------- START FLASK SERVER ----------------
