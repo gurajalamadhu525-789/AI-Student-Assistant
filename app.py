@@ -1,5 +1,6 @@
 import json
 import os
+import time
 
 import requests
 from flask import (
@@ -50,25 +51,68 @@ def _to_gemini_contents(messages):
 
 
 def gemini_generate(messages, timeout=180, max_tokens=1500):
-    """Non-streaming Gemini call. Returns the assistant text."""
-    response = requests.post(
-        _gemini_url("generateContent"),
-        headers={"Content-Type": "application/json"},
-        json={
-            "contents": _to_gemini_contents(messages),
-            "generationConfig": {
-                "maxOutputTokens": max_tokens,
-                "temperature": 0.7,
-            },
-        },
-        timeout=timeout,
-    )
-    response.raise_for_status()
-    data = response.json()
-    try:
-        return data["candidates"][0]["content"]["parts"][0]["text"].strip()
-    except (KeyError, IndexError, TypeError) as exc:
-        raise RuntimeError(f"Unexpected Gemini response format: {data}") from exc
+    """Non-streaming Gemini call with automatic retry & fallback on 503 high demand."""
+    if not GEMINI_API_KEY:
+        raise RuntimeError(
+            "GEMINI_API_KEY environment variable is not set. "
+            "Add it to your deployment environment."
+        )
+
+    candidate_models = [
+        GEMINI_MODEL,
+        "gemini-3.8-flash-lite",
+        "gemini-3.8-pro",
+        "gemini-1.5-flash",
+    ]
+    models_to_try = []
+    for m in candidate_models:
+        if m and m not in models_to_try:
+            models_to_try.append(m)
+
+    last_error = None
+
+    for model in models_to_try:
+        url = f"{GEMINI_BASE_URL}/{model}:generateContent?key={GEMINI_API_KEY}"
+        for attempt in range(3):
+            try:
+                response = requests.post(
+                    url,
+                    headers={"Content-Type": "application/json"},
+                    json={
+                        "contents": _to_gemini_contents(messages),
+                        "generationConfig": {
+                            "maxOutputTokens": max_tokens,
+                            "temperature": 0.7,
+                        },
+                    },
+                    timeout=timeout,
+                )
+
+                if response.status_code == 503:
+                    # Model overloaded, retry with backoff
+                    time.sleep(1.5 * (attempt + 1))
+                    continue
+
+                response.raise_for_status()
+                data = response.json()
+                try:
+                    return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                except (KeyError, IndexError, TypeError) as exc:
+                    raise RuntimeError(f"Unexpected Gemini response format: {data}") from exc
+
+            except requests.exceptions.HTTPError as err:
+                last_error = err
+                # If model not found (404) or overloaded (503), try next model
+                if response.status_code in (404, 503):
+                    break
+                raise
+            except Exception as err:
+                last_error = err
+                break
+
+    if last_error:
+        raise last_error
+    raise RuntimeError("All models failed to respond. Please try again.")
 
 
 def gemini_error_message(error):
