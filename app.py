@@ -17,7 +17,7 @@ app.config["MAX_CONTENT_LENGTH"] = 15 * 1024 * 1024
 
 # ── Google Gemini configuration ───────────────────────────────────────────────
 GEMINI_API_KEY  = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL    = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_MODEL    = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 
