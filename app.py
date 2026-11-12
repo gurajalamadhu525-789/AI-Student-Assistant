@@ -1,6 +1,7 @@
 import json
 import os
 import time
+import traceback
 
 import requests
 from flask import (
@@ -163,6 +164,19 @@ def ollama_error_message(error):                               # noqa: F811
     return gemini_error_message(error)
 
 
+@app.route("/api/test-ai")
+def test_ai():
+    try:
+        ans = gemini_generate([{"role": "user", "content": "say hello"}])
+        return jsonify({"success": True, "answer": ans})
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+        })
+
+
 @app.route("/api/models")
 def list_models():
     if not GEMINI_API_KEY:
@@ -270,7 +284,7 @@ def api_assistant():
 
     messages.append({"role": "user", "content": question})
 
-    # ── Gemini (non-streaming, simple & reliable) ─────────────────────
+    # ── Gemini (simple & reliable) ───────────────────────────────────
     try:
         answer = gemini_generate(messages, timeout=120, max_tokens=800)
     except RuntimeError as error:
@@ -278,13 +292,9 @@ def api_assistant():
     except Exception as error:
         return jsonify({"error": gemini_error_message(error)}), 502
 
-    @stream_with_context
-    def stream_tokens():
-        # Yield the full answer as one token so the frontend renders it
-        yield json.dumps({"token": answer}, ensure_ascii=False) + "\n"
-
+    line = json.dumps({"token": answer}, ensure_ascii=False) + "\n"
     return Response(
-        stream_tokens(),
+        line,
         mimetype="application/x-ndjson",
         headers={
             "Cache-Control": "no-cache",
