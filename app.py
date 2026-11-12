@@ -65,9 +65,10 @@ def gemini_generate(messages, timeout=180, max_tokens=1500):
     )
     response.raise_for_status()
     data = response.json()
-    return (
-        data["candidates"][0]["content"]["parts"][0]["text"].strip()
-    )
+    try:
+        return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+    except (KeyError, IndexError, TypeError) as exc:
+        raise RuntimeError(f"Unexpected Gemini response format: {data}") from exc
 
 
 def gemini_error_message(error):
@@ -195,79 +196,18 @@ def api_assistant():
 
     messages.append({"role": "user", "content": question})
 
-    # ── Gemini streaming ──────────────────────────────────────────────
+    # ── Gemini (non-streaming, simple & reliable) ─────────────────────
     try:
-        gemini_resp = requests.post(
-            _gemini_url("streamGenerateContent"),
-            headers={"Content-Type": "application/json"},
-            json={
-                "contents": _to_gemini_contents(messages),
-                "generationConfig": {
-                    "maxOutputTokens": 800,
-                    "temperature": 0.7,
-                },
-            },
-            stream=True,
-            timeout=(10, 300),
-        )
-        gemini_resp.raise_for_status()
-
+        answer = gemini_generate(messages, timeout=120, max_tokens=800)
     except RuntimeError as error:
         return jsonify({"error": str(error)}), 502
-    except requests.exceptions.RequestException as error:
+    except Exception as error:
         return jsonify({"error": gemini_error_message(error)}), 502
 
     @stream_with_context
     def stream_tokens():
-        buffer = ""
-        try:
-            for chunk in gemini_resp.iter_content(chunk_size=None, decode_unicode=True):
-                buffer += chunk
-                # Gemini streams a JSON array — parse complete objects as they arrive
-                while True:
-                    start = buffer.find('"text":')
-                    if start == -1:
-                        break
-                    # find the string value after "text":
-                    q1 = buffer.find('"', start + 7)
-                    if q1 == -1:
-                        break
-                    q2 = q1 + 1
-                    text = ""
-                    while q2 < len(buffer):
-                        c = buffer[q2]
-                        if c == "\\" and q2 + 1 < len(buffer):
-                            esc = buffer[q2 + 1]
-                            if esc == "n":
-                                text += "\n"
-                            elif esc == "t":
-                                text += "\t"
-                            elif esc == '"':
-                                text += '"'
-                            elif esc == "\\":
-                                text += "\\"
-                            else:
-                                text += esc
-                            q2 += 2
-                        elif c == '"':
-                            break
-                        else:
-                            text += c
-                            q2 += 1
-                    else:
-                        break   # incomplete string — wait for more data
-                    buffer = buffer[q2 + 1:]
-                    if text:
-                        yield (
-                            json.dumps({"token": text}, ensure_ascii=False) + "\n"
-                        )
-
-        except GeneratorExit:
-            pass
-        except Exception as error:
-            yield json.dumps({"error": str(error)}, ensure_ascii=False) + "\n"
-        finally:
-            gemini_resp.close()
+        # Yield the full answer as one token so the frontend renders it
+        yield json.dumps({"token": answer}, ensure_ascii=False) + "\n"
 
     return Response(
         stream_tokens(),
