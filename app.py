@@ -173,45 +173,37 @@ def list_models():
 
 @app.route("/")
 def home():
-    return render_template("index.html")
+    return render_template("app.html", page="home")
 
 
-# ---------------- ASSISTANT PAGE ----------------
+# ---------------- ASSISTANT / CHAT PAGE ----------------
 
 @app.route("/assistant")
-def assistant_page():
-    return render_template("chat.html")
-
-
 @app.route("/chat")
-def chat_page():
-    return render_template("chat.html")
+def assistant_page():
+    return render_template("app.html", page="assistant")
 
 
 # ---------------- PDF ASSISTANT PAGE ----------------
 
 @app.route("/pdf-assistant")
-def pdf_assistant_page():
-    return render_template("pdf_assistant.html")
-
-
 @app.route("/pdf")
-def pdf_page():
-    return render_template("pdf_assistant.html")
+def pdf_assistant_page():
+    return render_template("app.html", page="pdf")
 
 
 # ---------------- QUIZ PAGE ----------------
 
 @app.route("/quiz")
 def quiz_page():
-    return render_template("quiz.html")
+    return render_template("app.html", page="quiz")
 
 
 # ---------------- STUDY PLANNER PAGE ----------------
 
 @app.route("/planner")
 def planner_page():
-    return render_template("planner.html")
+    return render_template("app.html", page="planner")
 
 
 # ---------------- AI ASSISTANT API ----------------
@@ -229,16 +221,41 @@ def api_assistant():
     if not isinstance(history, list):
         history = []
 
-    system_message = (
-        "You are an intelligent AI Student Assistant. "
-        "Answer directly using natural, friendly, simple English. "
-        "Understand follow-up questions using conversation history. "
-        "Explain difficult topics step by step. "
-        "Give examples when useful. "
-        "For coding questions, provide practical and correct code. "
-        "Keep simple answers short and provide details when requested. "
-        "If unsure, clearly say so."
-    )
+    bot = str(data.get("bot", "general")).strip().lower()
+
+    BOT_PERSONAS = {
+        "general": (
+            "You are StudyAI General Tutor, a friendly, patient, and knowledgeable academic partner for college students. "
+            "Explain concepts clearly using simple, engaging English and relatable analogies. "
+            "Break down difficult topics step by step using markdown formatting. "
+            "Be encouraging and direct. If unsure, clearly say so."
+        ),
+        "coder": (
+            "You are StudyAI Code Mentor, an elite software engineering tutor. "
+            "Help students write, debug, and understand code in Python, C++, Java, JavaScript, SQL, and other languages. "
+            "Always provide clean, correct, well-commented, and runnable code formatted in markdown code blocks with language tags. "
+            "Explain the logic step by step, diagnose errors clearly, and mention time/space complexity (Big-O) when helpful."
+        ),
+        "math": (
+            "You are StudyAI Math & Science Solver, an expert in Mathematics, Physics, Chemistry, and Engineering. "
+            "Break down problems step by step with clear reasoning and derivations. "
+            "Show every formula used, substitution step, and units. Highlight final answers clearly. "
+            "Explain the intuition and principles behind the math so the student truly understands."
+        ),
+        "writer": (
+            "You are StudyAI Essay & Writing Coach, an expert academic editor and writing mentor. "
+            "Help students outline essays, sharpen thesis statements, improve vocabulary, and fix grammar. "
+            "Suggest stronger sentence structures and formal academic transitions. "
+            "Provide concrete before/after rewrite examples alongside your suggestions."
+        ),
+        "exam": (
+            "You are StudyAI Exam & Revision Coach, focused on high-yield, memory-retentive exam prep. "
+            "Provide high-impact summaries, bullet points, key definitions, and memory mnemonics. "
+            "Point out common exam traps, frequently tested questions, and end with 2 quick test-yourself questions."
+        ),
+    }
+
+    system_message = BOT_PERSONAS.get(bot, BOT_PERSONAS["general"])
 
     messages = [{"role": "system", "content": system_message}]
 
