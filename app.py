@@ -52,8 +52,8 @@ def _to_gemini_contents(messages):
     return contents
 
 
-def gemini_generate(messages, timeout=120, max_tokens=1500):
-    """Gemini call using gemini-3.8-flash with automatic retry on temporary traffic spikes."""
+def gemini_generate(messages, timeout=30, max_tokens=1500):
+    """Gemini call using gemini-3.8-flash with fast recovery on temporary spikes."""
     if not GEMINI_API_KEY:
         raise RuntimeError(
             "GEMINI_API_KEY environment variable is not set. "
@@ -62,24 +62,26 @@ def gemini_generate(messages, timeout=120, max_tokens=1500):
 
     url = f"{GEMINI_BASE_URL}/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
 
-    for attempt in range(4):
+    payload = {
+        "contents": _to_gemini_contents(messages),
+        "generationConfig": {
+            "maxOutputTokens": max_tokens,
+            "temperature": 0.7,
+        },
+    }
+
+    last_error = None
+    for attempt in range(2):
         try:
             response = requests.post(
                 url,
                 headers={"Content-Type": "application/json"},
-                json={
-                    "contents": _to_gemini_contents(messages),
-                    "generationConfig": {
-                        "maxOutputTokens": max_tokens,
-                        "temperature": 0.7,
-                    },
-                },
+                json=payload,
                 timeout=timeout,
             )
 
             if response.status_code in (429, 503):
-                # Temporary demand spike or rate limit — back off and retry
-                time.sleep(2.0 * (attempt + 1))
+                time.sleep(1.0)
                 continue
 
             response.raise_for_status()
@@ -90,12 +92,18 @@ def gemini_generate(messages, timeout=120, max_tokens=1500):
                 raise RuntimeError(f"Unexpected response format: {data}") from exc
 
         except requests.exceptions.HTTPError as err:
-            if response.status_code in (429, 503) and attempt < 3:
-                time.sleep(2.0 * (attempt + 1))
+            last_error = err
+            if response.status_code in (429, 503):
+                time.sleep(1.0)
                 continue
             raise
+        except Exception as err:
+            last_error = err
+            break
 
-    raise RuntimeError("The AI server is experiencing high traffic. Please try again in a moment.")
+    if last_error:
+        raise last_error
+    raise RuntimeError("The AI server is experiencing temporary traffic. Please try again in a moment.")
 
 
 def gemini_error_message(error):
@@ -134,6 +142,32 @@ def openai_error_message(error):                               # noqa: F811
 
 def ollama_error_message(error):                               # noqa: F811
     return gemini_error_message(error)
+
+
+@app.route("/api/debug-gemini")
+def debug_gemini():
+    url = f"{GEMINI_BASE_URL}/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
+    payloads = [
+        ("standard", {"contents": [{"role": "user", "parts": [{"text": "hi"}]}]}),
+        ("no_thinking", {
+            "contents": [{"role": "user", "parts": [{"text": "hi"}]}],
+            "generationConfig": {"thinkingConfig": {"thinkingBudget": 0}},
+        }),
+    ]
+    results = {}
+    for name, p in payloads:
+        try:
+            t0 = time.time()
+            r = requests.post(url, json=p, timeout=15)
+            elapsed = round(time.time() - t0, 2)
+            results[name] = {
+                "status": r.status_code,
+                "elapsed": elapsed,
+                "data": r.json() if r.status_code == 200 else r.text[:200],
+            }
+        except Exception as e:
+            results[name] = {"error": str(e)}
+    return jsonify(results)
 
 
 @app.route("/api/test-ai")
