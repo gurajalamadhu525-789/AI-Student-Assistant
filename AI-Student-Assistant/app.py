@@ -20,7 +20,7 @@ app.config["MAX_CONTENT_LENGTH"] = 15 * 1024 * 1024
 # ── Google Gemini configuration ───────────────────────────────────────────────
 GEMINI_API_KEY  = os.getenv("GEMINI_API_KEY", "")
 
-GEMINI_MODEL    = "gemini-3.8-flash"
+GEMINI_MODEL    = "gemini-2.5-flash-lite"
 
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 
@@ -67,6 +67,7 @@ def gemini_generate(messages, timeout=30, max_tokens=1500):
         "generationConfig": {
             "maxOutputTokens": max_tokens,
             "temperature": 0.7,
+            "thinkingConfig": {"thinkingBudget": 0},
         },
     }
 
